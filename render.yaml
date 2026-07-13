@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: hibaru-reading-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://hibaru-reading-program.netlify.app
+      # Secrets below are intentionally left blank in this file (sync: false
+      # means Render prompts for them during setup and stores them only in
+      # its own dashboard — never in this repo).
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: MASTER_ADMIN_USERNAME
+        sync: false
+      - key: MASTER_ADMIN_PASSWORD
+        sync: false
