@@ -4,3 +4,6 @@ Education Reading Program App-handoff.zip
 # Original design export — contains a hardcoded demo password and isn't
 # part of the deployed app (client/, server/) anyway.
 Education Reading Program App-handoff/
+
+# Local Netlify folder
+.netlify
