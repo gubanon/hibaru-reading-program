@@ -1,0 +1,38 @@
+# Fly.io app config for the HIBARU backend.
+# `app` must be globally unique across all Fly users — `fly launch` will ask
+# you to confirm or change it, so the value below is just a starting point.
+app = "hibaru-reading-api"
+primary_region = "sin"
+
+[build]
+
+[env]
+  PORT = "4000"
+  DB_PATH = "/data/data.db"
+  NODE_ENV = "production"
+
+# Secrets (JWT_SECRET, CORS_ORIGIN, ADMIN_PASSWORD, MASTER_ADMIN_PASSWORD)
+# are NOT set here — this file is meant to be safe to commit. Set them with
+# `fly secrets set KEY=value` instead (see DEPLOY.md).
+
+[[mounts]]
+  source = "hibaru_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

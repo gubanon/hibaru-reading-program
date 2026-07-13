@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap');
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; padding: 0; background: #F6F5F1; min-height: 100%; }
+body { font-family: 'Lexend', sans-serif; color: #26251F; }
+a { color: #22335E; text-decoration: none; }
+a:hover { color: #F5B301; }
+button { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+
+@keyframes micpulse { 0% { opacity: .35; transform: scaleY(.4); } 50% { opacity: 1; transform: scaleY(1); } 100% { opacity: .35; transform: scaleY(.5); } }
+@keyframes recblink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+@media print {
+  [data-noprint] { display: none !important; }
+  body, html { background: #fff !important; }
+  [data-print-area] { box-shadow: none !important; border: none !important; }
+  [data-record] { page-break-after: always; }
+}
