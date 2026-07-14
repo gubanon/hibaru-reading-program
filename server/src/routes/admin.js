@@ -1,9 +1,20 @@
 const express = require("express");
+const bcrypt = require("bcryptjs");
+const { nanoid } = require("nanoid");
 const db = require("../db");
 const { requireAuth, requireRole } = require("../auth");
 
 const router = express.Router();
 router.use(requireAuth, requireRole("admin"));
+
+// A second tier above regular admin — only the master admin can create or
+// remove other admins, or delete a teacher/student account outright.
+// Regular admins keep the existing teacher-approval/suspend powers below.
+function requireMasterAdmin(req, res, next) {
+  const u = db.prepare("SELECT is_master_admin FROM users WHERE id = ?").get(req.user.id);
+  if (!u || !u.is_master_admin) return res.status(403).json({ error: "Only the master admin can do this." });
+  next();
+}
 
 router.get("/overview", (req, res) => {
   const teachersActive = db.prepare("SELECT COUNT(*) c FROM users WHERE role='teacher' AND status='active'").get().c;
@@ -54,11 +65,59 @@ router.get("/learners", (req, res) => {
     ORDER BY u.surname
   `).all();
   res.json({ learners: rows.map(s => ({
+    id: s.id,
     name: `${s.surname.toUpperCase()}, ${s.given_name} ${s.mi}`.trim(),
     sex: s.sex === "M" ? "Male" : "Female",
     className: s.class_name || "—",
     email: s.email
   })) });
+});
+
+// ===== Master-admin-only: manage admins =====
+router.get("/admins", requireMasterAdmin, (req, res) => {
+  const rows = db.prepare("SELECT * FROM users WHERE role='admin' ORDER BY created_at").all();
+  res.json({ admins: rows.map(a => ({
+    id: a.id, name: `${a.given_name} ${a.surname}`.trim(), email: a.email, position: a.position,
+    isMaster: !!a.is_master_admin, isSelf: a.id === req.user.id
+  })) });
+});
+
+router.post("/admins", requireMasterAdmin, (req, res) => {
+  const { name, email, password } = req.body || {};
+  if (!name?.trim() || !email?.trim() || !password || password.length < 8) {
+    return res.status(400).json({ error: "Please provide a name, email/username, and a password of at least 8 characters." });
+  }
+  const emailNorm = email.trim().toLowerCase();
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(emailNorm);
+  if (existing) return res.status(409).json({ error: "An account with that email already exists." });
+
+  const parts = name.trim().split(/\s+/);
+  const given = parts[0] || name.trim();
+  const surname = parts.length > 1 ? parts[parts.length - 1] : "";
+  db.prepare(`
+    INSERT INTO users (id, role, email, password_hash, status, surname, given_name, position, is_master_admin, password_owned, terms_accepted_at, created_at)
+    VALUES (?, 'admin', ?, ?, 'active', ?, ?, 'Admin', 0, 1, ?, ?)
+  `).run(nanoid(), emailNorm, bcrypt.hashSync(password, 12), surname, given, Date.now(), Date.now());
+  res.json({ ok: true });
+});
+
+router.delete("/admins/:id", requireMasterAdmin, (req, res) => {
+  if (req.params.id === req.user.id) return res.status(400).json({ error: "You can't remove your own admin account." });
+  const target = db.prepare("SELECT id, is_master_admin FROM users WHERE id = ? AND role='admin'").get(req.params.id);
+  if (!target) return res.status(404).json({ error: "Admin not found." });
+  db.prepare("DELETE FROM users WHERE id = ?").run(target.id);
+  res.json({ ok: true });
+});
+
+// ===== Master-admin-only: delete a teacher or student account outright =====
+router.delete("/users/:id", requireMasterAdmin, (req, res) => {
+  const target = db.prepare("SELECT id, role FROM users WHERE id = ?").get(req.params.id);
+  if (!target) return res.status(404).json({ error: "User not found." });
+  if (target.role === "admin") return res.status(400).json({ error: "Use the admin removal action for admin accounts." });
+  // ON DELETE CASCADE (classrooms, assignments, classroom_students,
+  // submissions all reference users.id) cleans up everything that account owned.
+  db.prepare("DELETE FROM users WHERE id = ?").run(target.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

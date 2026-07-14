@@ -26,7 +26,8 @@ function publicUser(u) {
     id: u.id, role: u.role, email: u.email, status: u.status,
     surname: u.surname, given: u.given_name, mi: u.mi, sex: u.sex,
     position: u.position, grade: u.grade_section,
-    school: u.school, division: u.division, region: u.region
+    school: u.school, division: u.division, region: u.region,
+    isMaster: !!u.is_master_admin
   };
 }
 
@@ -130,6 +131,25 @@ router.get("/me", requireAuth, (req, res) => {
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
   if (!user) return res.status(404).json({ error: "Account not found." });
   res.json({ user: publicUser(user) });
+});
+
+// Real password rotation, for every role. This is what makes the
+// ADMIN_PASSWORD/MASTER_ADMIN_PASSWORD env vars a one-time bootstrap value
+// rather than a permanent secret that has to keep living in server/.env —
+// once you change your password here, the account is marked password_owned
+// and the seed step on db.js will never overwrite it from the env var again.
+router.post("/change-password", requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: "Please provide your current password and a new password of at least 6 characters." });
+  }
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!user || user.password_hash === "UNCLAIMED" || !bcrypt.compareSync(currentPassword, user.password_hash)) {
+    return res.status(401).json({ error: "Current password is incorrect." });
+  }
+  const cost = user.role === "admin" ? 12 : 10;
+  db.prepare("UPDATE users SET password_hash = ?, password_owned = 1 WHERE id = ?").run(bcrypt.hashSync(newPassword, cost), user.id);
+  res.json({ ok: true });
 });
 
 router.put("/me", requireAuth, (req, res) => {

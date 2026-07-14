@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
   division TEXT NOT NULL DEFAULT 'Eastern Samar',
   region TEXT NOT NULL DEFAULT 'Region VIII – Eastern Visayas',
   terms_accepted_at INTEGER,
+  is_master_admin INTEGER NOT NULL DEFAULT 0,
+  password_owned INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
@@ -96,42 +98,67 @@ CREATE TABLE IF NOT EXISTS submissions (
 );
 `);
 
+// CREATE TABLE IF NOT EXISTS is a no-op on a table that already exists — it
+// does not add new columns. This project has a live database on Render with
+// real teacher/student/admin data, so new columns need an explicit
+// migration rather than just editing the CREATE TABLE above.
+function ensureColumn(table, column, ddl) {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (!cols.some(c => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+  }
+}
+ensureColumn("users", "is_master_admin", "is_master_admin INTEGER NOT NULL DEFAULT 0");
+ensureColumn("users", "password_owned", "password_owned INTEGER NOT NULL DEFAULT 0");
+
 // Admin credentials are read from env vars only (server/.env, gitignored,
 // never committed) — there is deliberately no real password baked into
-// source here. If a password env var is unset, a random one-time password
-// is generated and printed to the console so local dev still boots, but it
-// is never the same twice and never lands in source control.
+// source here. The env var only matters for bootstrapping: once someone
+// changes their password through the app (POST /api/auth/change-password),
+// that account is marked password_owned and the env var is ignored for it
+// from then on — so ADMIN_PASSWORD/MASTER_ADMIN_PASSWORD can and should be
+// removed from server/.env (and your host's env var settings) once you've
+// logged in and set a real password. If a password env var is unset AND the
+// account doesn't exist yet, a random one-time password is generated and
+// printed to the console so local dev still boots.
 const crypto = require("crypto");
 function randomPassword() {
   return crypto.randomBytes(9).toString("base64url");
 }
 
-function seedAdmin({ email, password, explicit, surname, given, position }) {
+function seedAdmin({ email, password, explicit, isMaster, surname, given, position }) {
   const emailNorm = email.trim().toLowerCase();
-  const existing = db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(emailNorm);
+  const existing = db.prepare("SELECT id, password_owned, is_master_admin FROM users WHERE email = ?").get(emailNorm);
   // A higher bcrypt cost factor for admin accounts specifically — these are
   // logged into far less often than teacher/student accounts, so the extra
   // hashing time is a worthwhile tradeoff against offline cracking of a
   // leaked hash.
   if (existing) {
-    // The env var is authoritative whenever it's actually set — this keeps
-    // the account in sync even if it was first created before the real
-    // password env var existed (e.g. left blank during initial host setup),
-    // which would otherwise permanently strand it on a one-time generated
-    // password. Admins have no in-app "change password" flow, so this env
-    // var is the only way to rotate one.
-    if (explicit) {
+    // Sync from the env var only if it's actually set AND the account
+    // hasn't taken ownership of its own password via the app — this keeps
+    // a stuck/forgotten env-seeded account recoverable, without silently
+    // clobbering a password someone deliberately changed through the UI.
+    if (explicit && !existing.password_owned) {
       db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(password, 12), existing.id);
+    }
+    // Backfill the master flag for an account that predates the
+    // is_master_admin column (added via the ensureColumn migration above,
+    // which can only default new columns to 0 — it can't know MASTER_ADMIN_USERNAME
+    // should be 1). Only ever promotes, never demotes, and only for the
+    // configured master identity — removal happens exclusively through the
+    // admin-management endpoints, never here.
+    if (isMaster && !existing.is_master_admin) {
+      db.prepare("UPDATE users SET is_master_admin = 1 WHERE id = ?").run(existing.id);
     }
     return;
   }
   db.prepare(
-    `INSERT INTO users (id, role, email, password_hash, status, surname, given_name, position, terms_accepted_at, created_at)
-     VALUES (?, 'admin', ?, ?, 'active', ?, ?, ?, ?, ?)`
-  ).run(nanoid(), emailNorm, bcrypt.hashSync(password, 12), surname, given, position, Date.now(), Date.now());
+    `INSERT INTO users (id, role, email, password_hash, status, surname, given_name, position, is_master_admin, terms_accepted_at, created_at)
+     VALUES (?, 'admin', ?, ?, 'active', ?, ?, ?, ?, ?, ?)`
+  ).run(nanoid(), emailNorm, bcrypt.hashSync(password, 12), surname, given, position, isMaster ? 1 : 0, Date.now(), Date.now());
   if (!explicit) {
     console.warn(`[hibaru] No password env var set for ${emailNorm} — generated a one-time password: ${password}`);
-    console.warn("[hibaru] Set it permanently via server/.env instead (see .env.example) so it doesn't change on every fresh DB.");
+    console.warn("[hibaru] Log in with it once, then use Change Password in the app — the env var and this generated password won't be needed again.");
   }
 }
 
@@ -139,13 +166,13 @@ function seed() {
   const adminPasswordEnv = process.env.ADMIN_PASSWORD;
   seedAdmin({
     email: process.env.ADMIN_EMAIL || "jinodocena11@gmail.com",
-    password: adminPasswordEnv || randomPassword(), explicit: !!adminPasswordEnv,
+    password: adminPasswordEnv || randomPassword(), explicit: !!adminPasswordEnv, isMaster: false,
     surname: "Docena", given: "Jino", position: "School Head"
   });
   const masterPasswordEnv = process.env.MASTER_ADMIN_PASSWORD;
   seedAdmin({
     email: process.env.MASTER_ADMIN_USERNAME || "biskotso",
-    password: masterPasswordEnv || randomPassword(), explicit: !!masterPasswordEnv,
+    password: masterPasswordEnv || randomPassword(), explicit: !!masterPasswordEnv, isMaster: true,
     surname: "", given: "Master Admin", position: "Master Administrator"
   });
 }

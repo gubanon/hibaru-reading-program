@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { NAVY, GOLD } from "../theme";
+import ChangePasswordModal from "./ChangePasswordModal";
 
 export default function TopBar({ roleLabel }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   return (
     <div data-noprint="1" style={{ display: "flex", alignItems: "center", gap: 16, padding: "12px 28px", background: NAVY, position: "sticky", top: 0, zIndex: 50 }}>
@@ -23,9 +26,14 @@ export default function TopBar({ roleLabel }) {
         <div style={{ fontSize: 12.5, fontWeight: 600, color: "#AEB8D4", padding: "8px 14px" }}>{roleLabel}</div>
       )}
       <button
+        onClick={() => setShowPasswordModal(true)}
+        style={{ border: "1px solid rgba(255,255,255,.25)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "transparent", color: "#AEB8D4", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}
+      >🔒 Change Password</button>
+      <button
         onClick={() => { logout(); navigate("/"); }}
         style={{ border: "1px solid rgba(255,255,255,.25)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "transparent", color: "#AEB8D4", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}
       >Log out</button>
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
     </div>
   );
 }
