@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../../api";
-import { NAVY } from "../../theme";
+import { NAVY , ACCENT } from "../../theme";
 
 export default function Quiz({ L, assignment, onSubmitted }) {
   const [answers, setAnswers] = useState({});
@@ -21,21 +21,21 @@ export default function Quiz({ L, assignment, onSubmitted }) {
   return (
     <>
       <div style={{ textAlign: "center", marginBottom: 22 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, letterSpacing: ".08em" }}>{L.step3}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, letterSpacing: ".08em" }}>{L.step3}</div>
         <h2 style={{ margin: "8px 0 4px", fontSize: 23, fontWeight: 700 }}>{L.step3Title}</h2>
-        <div style={{ fontSize: 13.5, color: "#6B6A63" }}>{L.step3Sub}</div>
+        <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>{L.step3Sub}</div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {assignment.questions.map((q, qi) => (
-          <div key={q.id} style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 20 }}>
+          <div key={q.id} style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 12 }}>{qi + 1}. {q.text}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9 }}>
               {q.options.map((o, oi) => {
                 const sel = answers[qi] === oi;
                 return (
                   <button key={oi} onClick={() => setAnswers({ ...answers, [qi]: oi })}
-                    style={{ border: `2px solid ${sel ? NAVY : "#E7E5DD"}`, cursor: "pointer", padding: "11px 14px", borderRadius: 10, background: sel ? "#E9EDF7" : "#fff", fontFamily: "inherit", fontSize: 13.5, textAlign: "left", color: "#26251F", display: "flex", gap: 8, alignItems: "baseline" }}>
-                    <span style={{ fontWeight: 700, color: NAVY }}>{["A", "B", "C", "D"][oi]}.</span><span>{o}</span>
+                    style={{ border: `2px solid ${sel ? NAVY : "var(--card-border)"}`, cursor: "pointer", padding: "11px 14px", borderRadius: 10, background: sel ? "#E9EDF7" : "var(--card-bg)", fontFamily: "inherit", fontSize: 13.5, textAlign: "left", color: "var(--text)", display: "flex", gap: 8, alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 700, color: ACCENT }}>{["A", "B", "C", "D"][oi]}.</span><span>{o}</span>
                   </button>
                 );
               })}

@@ -40,13 +40,13 @@ export default function StudentConsole() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F5F1" }}>
+    <div style={{ minHeight: "100vh", background: "var(--page-bg)" }}>
       <TopBar roleLabel="🧑‍🎓 Student" />
       <div style={{ maxWidth: 880, margin: "0 auto", padding: "26px 28px 60px" }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
-          <div style={{ display: "flex", gap: 4, background: "#fff", border: "1px solid #E0DED5", padding: 3, borderRadius: 9 }}>
-            <button onClick={() => setLang("en")} style={{ border: "none", cursor: "pointer", padding: "6px 14px", borderRadius: 7, fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: lang === "en" ? NAVY : "#fff", color: lang === "en" ? "#fff" : "#4A4940" }}>ENGLISH</button>
-            <button onClick={() => setLang("fil")} style={{ border: "none", cursor: "pointer", padding: "6px 14px", borderRadius: 7, fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: lang === "fil" ? NAVY : "#fff", color: lang === "fil" ? "#fff" : "#4A4940" }}>FILIPINO</button>
+          <div style={{ display: "flex", gap: 4, background: "var(--card-bg)", border: "1px solid var(--input-border)", padding: 3, borderRadius: 9 }}>
+            <button onClick={() => setLang("en")} style={{ border: "none", cursor: "pointer", padding: "6px 14px", borderRadius: 7, fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: lang === "en" ? NAVY : "var(--card-bg)", color: lang === "en" ? "var(--card-bg)" : "var(--text-muted)" }}>ENGLISH</button>
+            <button onClick={() => setLang("fil")} style={{ border: "none", cursor: "pointer", padding: "6px 14px", borderRadius: 7, fontFamily: "inherit", fontSize: 12, fontWeight: 700, background: lang === "fil" ? NAVY : "var(--card-bg)", color: lang === "fil" ? "var(--card-bg)" : "var(--text-muted)" }}>FILIPINO</button>
           </div>
         </div>
 

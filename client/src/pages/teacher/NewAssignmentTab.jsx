@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { FAINT, NAVY } from "../../theme";
+import { FAINT, NAVY , ACCENT } from "../../theme";
 import { Toast } from "../../components/ui";
 
 function wordCount(text) {
   return (text || "").trim().split(/\s+/).filter(Boolean).length;
 }
 
-const fieldLabel = { fontSize: 12, fontWeight: 600, color: "#6B6A63", marginBottom: 5 };
-const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14, padding: "10px 12px", border: "1px solid #E0DED5", borderRadius: 8, outline: "none" };
-const dropZone = { flex: 1, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 11.5, color: "#A9A89E", fontFamily: "monospace", textAlign: "center", background: "repeating-linear-gradient(45deg,#FCFBF8,#FCFBF8 8px,#F6F5F0 8px,#F6F5F0 16px)" };
+const fieldLabel = { fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 5 };
+const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14, padding: "10px 12px", border: "1px solid var(--input-border)", borderRadius: 8, outline: "none" };
+const dropZone = { flex: 1, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 11.5, color: "var(--text-faint-2)", fontFamily: "monospace", textAlign: "center", background: "repeating-linear-gradient(45deg,#FCFBF8,#FCFBF8 8px,#F6F5F0 8px,#F6F5F0 16px)" };
 
 export default function NewAssignmentTab({ onCreated }) {
   const [classes, setClasses] = useState([]);
@@ -78,7 +78,7 @@ export default function NewAssignmentTab({ onCreated }) {
         <span style={{ fontSize: 12.5, color: FAINT }}>Bagong Takdang-Aralin</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 18, alignItems: "start" }}>
-        <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <div style={fieldLabel}>TITLE · PAMAGAT</div>
             <input style={inputStyle} value={title} onChange={e => setTitle(e.target.value)} placeholder="Name of the reading task" />
@@ -90,7 +90,7 @@ export default function NewAssignmentTab({ onCreated }) {
           <div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 5 }}>
               <div style={fieldLabel}>READING PASSAGE (upload or paste)</div>
-              <div style={{ fontSize: 11.5, color: NAVY, fontWeight: 600 }}>{wordCount(passage)} words</div>
+              <div style={{ fontSize: 11.5, color: ACCENT, fontWeight: 600 }}>{wordCount(passage)} words</div>
             </div>
             <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical", lineHeight: 1.6 }} value={passage} onChange={e => setPassage(e.target.value)} placeholder="Paste the passage text here — word count updates automatically" />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -102,22 +102,22 @@ export default function NewAssignmentTab({ onCreated }) {
             <div style={fieldLabel}>COMPREHENSION QUESTIONS ({questions.length})</div>
             <div style={{ display: "flex", gap: 8 }}>
               <input style={{ ...inputStyle, flex: 1 }} value={newQ} onChange={e => setNewQ(e.target.value)} placeholder="Type a question, then Add" onKeyDown={e => e.key === "Enter" && addQuestion()} />
-              <button onClick={addQuestion} style={{ border: "none", cursor: "pointer", padding: "9px 16px", borderRadius: 8, background: "#F0EEE7", color: "#26251F", fontFamily: "inherit", fontSize: 13, fontWeight: 600 }}>Add</button>
+              <button onClick={addQuestion} style={{ border: "none", cursor: "pointer", padding: "9px 16px", borderRadius: 8, background: "var(--chip-bg)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 600 }}>Add</button>
             </div>
-            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 12, color: "#6B6A63", fontWeight: 600, cursor: "pointer", background: "#FCFBF8" }}>
+            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 12, color: "var(--text-muted)", fontWeight: 600, cursor: "pointer", background: "#FCFBF8" }}>
               📎 {importing ? "Reading file…" : "Upload questions from DOCX / PDF"}
               <input type="file" accept=".docx,.pdf" onChange={importQuestions} style={{ display: "none" }} />
             </label>
-            <div style={{ fontSize: 10.5, color: "#A9A89E", marginTop: 4 }}>One question per line, ending with "?" — they'll be added to the list below.</div>
+            <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 4 }}>One question per line, ending with "?" — they'll be added to the list below.</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
               {questions.map((q, i) => (
-                <div key={i} style={{ fontSize: 12.5, padding: "7px 10px", background: "#FAF9F5", borderRadius: 7, color: "#4A4940" }}>{i + 1}. {q}</div>
+                <div key={i} style={{ fontSize: 12.5, padding: "7px 10px", background: "var(--subtle-bg)", borderRadius: 7, color: "var(--text-muted)" }}>{i + 1}. {q}</div>
               ))}
             </div>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 13 }}>
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 13 }}>
             <div>
               <div style={fieldLabel}>TARGET CLASSROOM</div>
               <select style={{ ...inputStyle, padding: "9px 10px" }} value={classId} onChange={e => setClassId(e.target.value)}>

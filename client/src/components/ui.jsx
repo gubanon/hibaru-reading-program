@@ -12,7 +12,7 @@ export function Field({ label, children }) {
 
 const inputStyle = {
   width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14,
-  padding: "13px 14px", border: `1.5px solid ${INPUT_BORDER}`, borderRadius: 11, outline: "none", background: "#fff"
+  padding: "13px 14px", border: `1.5px solid ${INPUT_BORDER}`, borderRadius: 11, outline: "none", background: "var(--card-bg)"
 };
 
 export function TextInput(props) {
@@ -50,7 +50,7 @@ export function Select({ children, ...props }) {
 }
 
 export function Card({ children, style, ...rest }) {
-  return <div style={{ background: "#fff", border: `1px solid ${BORDER}`, borderRadius: 14, ...style }} {...rest}>{children}</div>;
+  return <div style={{ background: "var(--card-bg)", border: `1px solid ${BORDER}`, borderRadius: 14, ...style }} {...rest}>{children}</div>;
 }
 
 export function StatCard({ label, value, sub, color }) {
@@ -70,7 +70,7 @@ export function Pill({ active, onClick, children }) {
       style={{
         border: `1px solid ${active ? NAVY : INPUT_BORDER}`, cursor: "pointer", padding: "9px 16px",
         borderRadius: 999, fontFamily: "inherit", fontSize: 13, fontWeight: 600,
-        background: active ? NAVY : "#fff", color: active ? "#fff" : "#4A4940"
+        background: active ? NAVY : "var(--card-bg)", color: active ? "var(--card-bg)" : "var(--text-muted)"
       }}
     >{children}</button>
   );
@@ -95,7 +95,7 @@ export function GhostButton({ children, style, ...rest }) {
       {...rest}
       style={{
         border: `1px solid ${INPUT_BORDER}`, cursor: "pointer", padding: "8px 14px", borderRadius: 8,
-        background: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
+        background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600,
         ...style
       }}
     >{children}</button>

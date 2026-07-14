@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { api } from "../../api";
-import { NAVY } from "../../theme";
+import { NAVY , ACCENT } from "../../theme";
 
 const SpeechRecognitionImpl = typeof window !== "undefined"
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
@@ -45,9 +45,9 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
   return (
     <>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, letterSpacing: ".08em" }}>{L.step1}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, letterSpacing: ".08em" }}>{L.step1}</div>
         <h2 style={{ margin: "8px 0 4px", fontSize: 23, fontWeight: 700 }}>{L.step1Title}</h2>
-        <div style={{ fontSize: 13.5, color: "#6B6A63" }}>{L.step1Sub}</div>
+        <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>{L.step1Sub}</div>
         {warn && <div style={{ fontSize: 12.5, color: "#B3261E", marginTop: 8 }}>{warn}</div>}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 14, marginBottom: 26 }}>
@@ -56,10 +56,10 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
           const listening = activeWord === v.word;
           return (
             <button key={v.word} onClick={() => practiceWord(v.word)}
-              style={{ border: `2px solid ${done ? "oklch(0.7 0.1 155)" : listening ? NAVY : "#E0DED5"}`, cursor: "pointer", padding: "18px 14px", borderRadius: 14, background: done ? "oklch(0.96 0.03 155)" : "#fff", fontFamily: "inherit", textAlign: "center" }}>
-              <div style={{ fontSize: 19, fontWeight: 700, color: "#26251F" }}>{v.word}</div>
-              <div style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.5, color: "#6B6A63" }}>{lang === "fil" ? v.defFil : v.def}</div>
-              <div style={{ fontSize: 12, marginTop: 8, fontWeight: 600, color: done ? "oklch(0.5 0.12 155)" : listening ? NAVY : "#8A897F" }}>
+              style={{ border: `2px solid ${done ? "oklch(0.7 0.1 155)" : listening ? NAVY : "var(--input-border)"}`, cursor: "pointer", padding: "18px 14px", borderRadius: 14, background: done ? "oklch(0.96 0.03 155)" : "var(--card-bg)", fontFamily: "inherit", textAlign: "center" }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: "var(--text)" }}>{v.word}</div>
+              <div style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.5, color: "var(--text-muted)" }}>{lang === "fil" ? v.defFil : v.def}</div>
+              <div style={{ fontSize: 12, marginTop: 8, fontWeight: 600, color: done ? "oklch(0.5 0.12 155)" : listening ? NAVY : "var(--text-faint)" }}>
                 {done ? L.unlocked : listening ? L.listening : L.tapSay}
               </div>
             </button>

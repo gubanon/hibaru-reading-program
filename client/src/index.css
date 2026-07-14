@@ -1,9 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&display=swap');
 
+:root {
+  --ink: #26251F;
+  --accent: #22335E;
+  --page-bg: #F6F5F1;
+  --card-bg: #fff;
+  --text: #26251F;
+  --text-muted: #6B6A63;
+  --text-faint: #8A897F;
+  --text-faint-2: #A9A89E;
+  --card-border: #E7E5DD;
+  --input-border: #E0DED5;
+  --divider: #F4F2EC;
+  --subtle-bg: #FAF9F5;
+  --chip-bg: #F0EEE7;
+}
+[data-theme="dark"] {
+  --accent: #8DA3E0;
+  --page-bg: #191A20;
+  --card-bg: #23242B;
+  --text: #EDECEA;
+  --text-muted: #B7B5AE;
+  --text-faint: #8D8B85;
+  --text-faint-2: #706E68;
+  --card-border: #34353D;
+  --input-border: #3C3D45;
+  --divider: #2C2D34;
+  --subtle-bg: #2A2B32;
+  --chip-bg: #2F3037;
+}
+
 * { box-sizing: border-box; }
-html, body, #root { margin: 0; padding: 0; background: #F6F5F1; min-height: 100%; }
-body { font-family: 'Lexend', sans-serif; color: #26251F; }
+html, body, #root { margin: 0; padding: 0; background: var(--page-bg); min-height: 100%; }
+body { font-family: 'Lexend', sans-serif; color: var(--text); }
 a { color: #22335E; text-decoration: none; }
+[data-theme="dark"] a { color: #7C93D6; }
 a:hover { color: #F5B301; }
 button { font-family: inherit; }
 input, textarea, select { font-family: inherit; }
@@ -12,6 +43,24 @@ input, textarea, select { font-family: inherit; }
 @keyframes recblink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 
 @media print {
+  /* Printed reports (Phil-IRI Form 3, assignment sheets) must read as
+     plain paper regardless of whether the screen is in dark mode — force
+     every themed surface/text variable back to its light value. */
+  :root, [data-theme="dark"] {
+    --ink: #26251F;
+    --accent: #22335E;
+    --page-bg: #fff;
+    --card-bg: #fff;
+    --text: #26251F;
+    --text-muted: #6B6A63;
+    --text-faint: #8A897F;
+    --text-faint-2: #A9A89E;
+    --card-border: #E7E5DD;
+    --input-border: #E0DED5;
+    --divider: #F4F2EC;
+    --subtle-bg: #FAF9F5;
+    --chip-bg: #F0EEE7;
+  }
   [data-noprint] { display: none !important; }
   body, html { background: #fff !important; }
   [data-print-area] { box-shadow: none !important; border: none !important; }

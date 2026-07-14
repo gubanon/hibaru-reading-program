@@ -43,27 +43,27 @@ export default function AnalyticsTab() {
         <span style={{ fontSize: 12.5, color: FAINT }}>Buod ng Klase</span>
         <div style={{ flex: 1 }} />
         <select value={assignmentId || ""} onChange={e => setAssignmentId(e.target.value)}
-          style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", border: "1px solid #E0DED5", borderRadius: 8, background: "#fff" }}>
+          style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", border: "1px solid var(--input-border)", borderRadius: 8, background: "var(--card-bg)" }}>
           {assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
         </select>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14, marginBottom: 18 }}>
         {data.stats.map((s, i) => <StatCard key={i} {...s} />)}
       </div>
-      <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 22 }}>
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 22 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 14 }}>Reading Profiles — turned-in submissions</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 560 }}>
           {levels.map(lv => (
             <div key={lv.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr 90px", gap: 10, alignItems: "center", fontSize: 13 }}>
               <div style={{ fontWeight: 600 }}>{lv.label}</div>
-              <div style={{ height: 22, background: "#F0EEE7", borderRadius: 7, overflow: "hidden" }}>
+              <div style={{ height: 22, background: "var(--chip-bg)", borderRadius: 7, overflow: "hidden" }}>
                 <div style={{ height: "100%", background: lv.color, width: `${Math.round(lv.count / maxLvl * 100)}%` }} />
               </div>
-              <div style={{ color: "#6B6A63" }}>{lv.count} student(s)</div>
+              <div style={{ color: "var(--text-muted)" }}>{lv.count} student(s)</div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 16, fontSize: 12, color: "#8A897F" }}>Word Reading: 97–100 Independent · 90–96 Instructional · ≤89 Frustration &nbsp;&nbsp;|&nbsp;&nbsp; Comprehension: 80–100 Independent · 59–79 Instructional · ≤58 Frustration</div>
+        <div style={{ marginTop: 16, fontSize: 12, color: "var(--text-faint)" }}>Word Reading: 97–100 Independent · 90–96 Instructional · ≤89 Frustration &nbsp;&nbsp;|&nbsp;&nbsp; Comprehension: 80–100 Independent · 59–79 Instructional · ≤58 Frustration</div>
       </div>
     </>
   );

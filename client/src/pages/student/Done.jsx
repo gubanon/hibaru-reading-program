@@ -7,7 +7,7 @@ function timeText(secs) {
 
 export default function Done({ L, result, onBack }) {
   const stats = [
-    { label: L.readingRate, value: `${result.wpm} wpm`, sub: `${timeText(result.seconds)} ${L.readingTime}`, color: "#26251F" },
+    { label: L.readingRate, value: `${result.wpm} wpm`, sub: `${timeText(result.seconds)} ${L.readingTime}`, color: "var(--text)" },
     { label: L.wordScore, value: `${result.score}%`, sub: `${result.tm} ${L.miscuesDetected}`, color: levelColor(result.level) },
     { label: L.readingLevel, value: result.level, sub: L.wordReadingLevel, color: levelColor(result.level) },
     { label: L.comprehension, value: `${result.correct}/${result.items}`, sub: `${result.acc}% · ${result.compLevel}`, color: levelColor(result.compLevel) }
@@ -17,19 +17,19 @@ export default function Done({ L, result, onBack }) {
       <div style={{ textAlign: "center", marginBottom: 22 }}>
         <div style={{ fontSize: 44 }}>🎉</div>
         <h2 style={{ margin: "8px 0 4px", fontSize: 24, fontWeight: 700 }}>{L.doneTitle}</h2>
-        <div style={{ fontSize: 13.5, color: "#6B6A63" }}>{L.doneSub}</div>
+        <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>{L.doneSub}</div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, maxWidth: 820, margin: "0 auto 20px" }}>
         {stats.map((d, i) => (
-          <div key={i} style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 13, padding: 18, textAlign: "center" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#8A897F", letterSpacing: ".05em" }}>{d.label}</div>
+          <div key={i} style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 13, padding: 18, textAlign: "center" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".05em" }}>{d.label}</div>
             <div style={{ fontSize: 26, fontWeight: 700, marginTop: 4, color: d.color }}>{d.value}</div>
-            <div style={{ fontSize: 11.5, color: "#8A897F" }}>{d.sub}</div>
+            <div style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{d.sub}</div>
           </div>
         ))}
       </div>
       <div style={{ textAlign: "center" }}>
-        <button onClick={onBack} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "12px 24px", borderRadius: 10, background: "#fff", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}>{L.backDash}</button>
+        <button onClick={onBack} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "12px 24px", borderRadius: 10, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}>{L.backDash}</button>
       </div>
     </>
   );

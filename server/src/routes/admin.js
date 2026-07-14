@@ -37,7 +37,8 @@ router.get("/overview", (req, res) => {
 router.get("/teachers", (req, res) => {
   const rows = db.prepare("SELECT * FROM users WHERE role='teacher' ORDER BY created_at DESC").all();
   res.json({ teachers: rows.map(t => ({
-    id: t.id, name: `${t.given_name} ${t.surname}`.trim(), email: t.email, position: t.position, status: t.status
+    id: t.id, name: `${t.given_name} ${t.surname}`.trim(), given: t.given_name, surname: t.surname,
+    email: t.email, position: t.position, status: t.status
   })) });
 });
 
@@ -56,21 +57,57 @@ router.post("/teachers/:id/suspend", (req, res) => {
   res.json({ ok: true });
 });
 
+// Any admin (not just master) can edit a teacher's account details — this
+// is the replacement for teacher self-service editing, which is
+// deliberately disabled (see PUT /auth/me) so identity details go through
+// admin oversight instead.
+router.put("/teachers/:id", (req, res) => {
+  const { given, surname, email, position } = req.body || {};
+  const target = db.prepare("SELECT id FROM users WHERE id = ? AND role = 'teacher'").get(req.params.id);
+  if (!target) return res.status(404).json({ error: "Teacher not found." });
+  if (!given?.trim() || !email?.trim()) return res.status(400).json({ error: "Please provide at least a given name and email." });
+  const emailNorm = email.trim().toLowerCase();
+  const clash = db.prepare("SELECT id FROM users WHERE email = ? AND id != ?").get(emailNorm, target.id);
+  if (clash) return res.status(409).json({ error: "Another account already uses that email." });
+
+  db.prepare("UPDATE users SET given_name = ?, surname = ?, email = ?, position = ? WHERE id = ?")
+    .run(given.trim(), (surname || "").trim(), emailNorm, position || "Teacher", target.id);
+  res.json({ ok: true });
+});
+
+// Grouped by classroom (alphabetically), then split male/female, each
+// alphabetical by surname — mirrors how the Teacher's Classrooms tab
+// already presents its roster.
 router.get("/learners", (req, res) => {
   const rows = db.prepare(`
     SELECT u.*, c.name as class_name FROM users u
     LEFT JOIN classroom_students cs ON cs.student_id = u.id
     LEFT JOIN classrooms c ON c.id = cs.classroom_id
     WHERE u.role = 'student'
-    ORDER BY u.surname
   `).all();
-  res.json({ learners: rows.map(s => ({
+  const toRow = s => ({
     id: s.id,
     name: `${s.surname.toUpperCase()}, ${s.given_name} ${s.mi}`.trim(),
     sex: s.sex === "M" ? "Male" : "Female",
-    className: s.class_name || "—",
+    className: s.class_name || "Unassigned",
     email: s.email
-  })) });
+  });
+  const byClass = new Map();
+  rows.forEach(s => {
+    const key = s.class_name || "Unassigned";
+    if (!byClass.has(key)) byClass.set(key, []);
+    byClass.get(key).push(s);
+  });
+  const bySurname = (a, b) => a.surname.localeCompare(b.surname);
+  const groups = [...byClass.keys()].sort((a, b) => a.localeCompare(b)).map(className => {
+    const students = byClass.get(className);
+    return {
+      className,
+      male: students.filter(s => s.sex === "M").sort(bySurname).map(toRow),
+      female: students.filter(s => s.sex !== "M").sort(bySurname).map(toRow)
+    };
+  });
+  res.json({ groups });
 });
 
 // ===== Master-admin-only: manage admins =====

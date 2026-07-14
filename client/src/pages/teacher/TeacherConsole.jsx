@@ -19,7 +19,7 @@ export default function TeacherConsole() {
   const [tab, setTab] = useState("classes");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F5F1" }}>
+    <div style={{ minHeight: "100vh", background: "var(--page-bg)" }}>
       <TopBar roleLabel="👩‍🏫 Teacher" />
       <div style={{ maxWidth: 1180, margin: "0 auto", padding: "22px 28px 60px" }}>
         <div data-noprint="1" style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>

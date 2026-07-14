@@ -3,7 +3,8 @@ import TopBar from "../../components/TopBar";
 import { api } from "../../api";
 import { useAuth } from "../../auth/AuthContext";
 import { Pill, StatCard, Field, TextInput, PasswordInput, PrimaryButton } from "../../components/ui";
-import { NAVY } from "../../theme";
+import { NAVY , ACCENT } from "../../theme";
+import EditTeacherModal from "./EditTeacherModal";
 
 const BASE_TABS = [
   { id: "overview", label: "📋 Overview" },
@@ -30,12 +31,24 @@ function DelegateAdminForm({ onCreated }) {
 
   return (
     <div style={{ border: "2px dashed #DDDACE", borderRadius: 14, padding: 20 }}>
-      <div style={{ fontWeight: 600, fontSize: 14, color: "#6B6A63", marginBottom: 12 }}>Delegate a new admin</div>
+      <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-muted)", marginBottom: 12 }}>Delegate a new admin</div>
       <Field label="FULL NAME"><TextInput value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Maria Santos" /></Field>
-      <Field label="EMAIL OR USERNAME"><TextInput value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@deped.gov.ph" /></Field>
+      <Field label="EMAIL OR USERNAME"><TextInput value={email} onChange={e => setEmail(e.target.value)} placeholder="admin@example.com" /></Field>
       <Field label="PASSWORD"><PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></Field>
       {error && <div style={{ marginBottom: 12, fontSize: 12.5, color: "#B3261E", fontWeight: 600 }}>{error}</div>}
       <PrimaryButton disabled={busy} onClick={submit} style={{ width: "100%", padding: 12 }}>+ Create admin</PrimaryButton>
+    </div>
+  );
+}
+
+function LearnerRow({ r }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, padding: "8px 10px", background: "var(--subtle-bg)", borderRadius: 8 }}>
+      <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--card-border)", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, color: "var(--text-muted)" }}>
+        {r.name.slice(0, 1)}
+      </div>
+      <span style={{ fontWeight: 500 }}>{r.name}</span>
+      <span style={{ color: "var(--text-faint-2)", fontSize: 11.5, marginLeft: "auto" }}>{r.email}</span>
     </div>
   );
 }
@@ -45,14 +58,15 @@ export default function AdminConsole() {
   const [tab, setTab] = useState("overview");
   const [overview, setOverview] = useState(null);
   const [teachers, setTeachers] = useState([]);
-  const [learners, setLearners] = useState([]);
+  const [learnerGroups, setLearnerGroups] = useState([]);
   const [admins, setAdmins] = useState([]);
+  const [editingTeacher, setEditingTeacher] = useState(null);
 
   const tabs = user?.isMaster ? [...BASE_TABS, { id: "admins", label: "🛡️ Admins" }] : BASE_TABS;
 
   const loadOverview = useCallback(() => api.get("/admin/overview").then(setOverview), []);
   const loadTeachers = useCallback(() => api.get("/admin/teachers").then(d => setTeachers(d.teachers)), []);
-  const loadLearners = useCallback(() => api.get("/admin/learners").then(d => setLearners(d.learners)), []);
+  const loadLearners = useCallback(() => api.get("/admin/learners").then(d => setLearnerGroups(d.groups)), []);
   const loadAdmins = useCallback(() => api.get("/admin/admins").then(d => setAdmins(d.admins)), []);
 
   useEffect(() => { loadOverview(); }, [loadOverview]);
@@ -75,14 +89,14 @@ export default function AdminConsole() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F6F5F1" }}>
+    <div style={{ minHeight: "100vh", background: "var(--page-bg)" }}>
       <TopBar roleLabel={user?.isMaster ? "🛡️ Master Admin" : "🛡️ Admin"} />
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: "22px 28px 60px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: "#F5B301", color: NAVY, display: "grid", placeItems: "center", fontSize: 19 }}>🛡️</div>
           <div>
             <h2 style={{ margin: 0, fontSize: 21, fontWeight: 700 }}>Admin Console</h2>
-            <div style={{ fontSize: 12, color: "#8A897F" }}>Full program oversight · Taft National High School (303529)</div>
+            <div style={{ fontSize: 12, color: "var(--text-faint)" }}>Full program oversight · Taft National High School (303529)</div>
           </div>
         </div>
 
@@ -104,23 +118,23 @@ export default function AdminConsole() {
         )}
 
         {tab === "teachers" && (
-          <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr 2fr 1.6fr 1.2fr 240px" : "2fr 2fr 1.6fr 1.2fr 180px", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "#8A897F", letterSpacing: ".04em", borderBottom: "1px solid #EFEDE6" }}>
+          <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr 2fr 1.6fr 1.2fr 300px" : "2fr 2fr 1.6fr 1.2fr 160px", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
               <div>NAME</div><div>EMAIL</div><div>POSITION</div><div>STATUS</div><div></div>
             </div>
             {teachers.map(r => {
               const isPending = r.status === "pending" || r.status === "Pending approval";
               const active = r.status === "active" || r.status === "Active";
               return (
-                <div key={r.id} style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr 2fr 1.6fr 1.2fr 240px" : "2fr 2fr 1.6fr 1.2fr 180px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid #F4F2EC", fontSize: 13 }}>
+                <div key={r.id} style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr 2fr 1.6fr 1.2fr 300px" : "2fr 2fr 1.6fr 1.2fr 160px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                     <div style={{ width: 28, height: 28, borderRadius: "50%", background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700 }}>
                       {r.name.split(" ").map(p => p[0]).join("").slice(0, 2)}
                     </div>
                     <span style={{ fontWeight: 600 }}>{r.name}</span>
                   </div>
-                  <div style={{ color: "#6B6A63" }}>{r.email}</div>
-                  <div style={{ color: "#6B6A63" }}>{r.position}</div>
+                  <div style={{ color: "var(--text-muted)" }}>{r.email}</div>
+                  <div style={{ color: "var(--text-muted)" }}>{r.position}</div>
                   <div>
                     <span style={{ fontSize: 11.5, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: active ? "oklch(0.93 0.05 155)" : "oklch(0.95 0.05 90)", color: active ? "oklch(0.4 0.1 155)" : "oklch(0.5 0.1 75)" }}>
                       {active ? "Active" : "Pending approval"}
@@ -130,78 +144,83 @@ export default function AdminConsole() {
                     {isPending && (
                       <>
                         <button onClick={() => approve(r.id)} style={{ border: "none", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "oklch(0.55 0.13 155)", color: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700 }}>✓ Approve</button>
-                        <button onClick={() => reject(r.id)} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "7px 11px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>✕</button>
+                        <button onClick={() => reject(r.id)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 11px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>✕</button>
                       </>
                     )}
                     {active && (
-                      <button onClick={() => suspend(r.id)} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#6B6A63" }}>Suspend</button>
+                      <>
+                        <button onClick={() => setEditingTeacher(r)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: ACCENT }}>Edit</button>
+                        <button onClick={() => suspend(r.id)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "var(--text-muted)" }}>Suspend</button>
+                      </>
                     )}
                     {user?.isMaster && (
-                      <button onClick={() => deleteUser(r.id, r.name)} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "7px 11px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>Delete</button>
+                      <button onClick={() => deleteUser(r.id, r.name)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 11px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>Delete</button>
                     )}
                   </div>
                 </div>
               );
             })}
-            {!teachers.length && <div style={{ padding: 24, color: "#8A897F", fontSize: 13 }}>No teacher accounts yet.</div>}
+            {!teachers.length && <div style={{ padding: 24, color: "var(--text-faint)", fontSize: 13 }}>No teacher accounts yet.</div>}
           </div>
         )}
 
         {tab === "learners" && (
-          <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr .8fr 1.4fr 1.8fr 90px" : "2.2fr .8fr 1.4fr 2fr", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "#8A897F", letterSpacing: ".04em", borderBottom: "1px solid #EFEDE6" }}>
-              <div>LEARNER</div><div>SEX</div><div>CLASS / SECTION</div><div>EMAIL</div>{user?.isMaster && <div></div>}
-            </div>
-            {learners.map((r) => (
-              <div key={r.id} style={{ display: "grid", gridTemplateColumns: user?.isMaster ? "2fr .8fr 1.4fr 1.8fr 90px" : "2.2fr .8fr 1.4fr 2fr", gap: 8, padding: "12px 18px", alignItems: "center", borderBottom: "1px solid #F4F2EC", fontSize: 13 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#E7E5DD", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 700, color: "#6B6A63" }}>
-                    {r.name.slice(0, 1)}
-                  </div>
-                  <span style={{ fontWeight: 600 }}>{r.name}</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {learnerGroups.map(g => (
+              <div key={g.className} style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{g.className}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-faint)" }}>{g.male.length + g.female.length} learner(s)</div>
                 </div>
-                <div style={{ color: "#6B6A63" }}>{r.sex}</div>
-                <div style={{ color: "#6B6A63" }}>{r.className}</div>
-                <div style={{ color: "#A9A89E", fontSize: 12 }}>{r.email}</div>
-                {user?.isMaster && (
-                  <div style={{ textAlign: "right" }}>
-                    <button onClick={() => deleteUser(r.id, r.name)} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "6px 10px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>Delete</button>
-                  </div>
-                )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: ".06em", marginTop: 2 }}>MALE</div>
+                  {g.male.map(r => <LearnerRow key={r.id} r={r} />)}
+                  {!g.male.length && <div style={{ fontSize: 12, color: "var(--text-faint-2)", padding: "2px 10px" }}>None</div>}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: ".06em", marginTop: 6 }}>FEMALE</div>
+                  {g.female.map(r => <LearnerRow key={r.id} r={r} />)}
+                  {!g.female.length && <div style={{ fontSize: 12, color: "var(--text-faint-2)", padding: "2px 10px" }}>None</div>}
+                </div>
               </div>
             ))}
-            {!learners.length && <div style={{ padding: 24, color: "#8A897F", fontSize: 13 }}>No learners yet.</div>}
+            {!learnerGroups.length && <div style={{ padding: 24, color: "var(--text-faint)", fontSize: 13, background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14 }}>No learners yet.</div>}
           </div>
         )}
 
         {tab === "admins" && user?.isMaster && (
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, alignItems: "start" }}>
-            <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1.8fr 2fr 1fr 90px", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "#8A897F", letterSpacing: ".04em", borderBottom: "1px solid #EFEDE6" }}>
+            <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1.8fr 2fr 1fr 90px", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
                 <div>NAME</div><div>EMAIL</div><div>ROLE</div><div></div>
               </div>
               {admins.map(a => (
-                <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1.8fr 2fr 1fr 90px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid #F4F2EC", fontSize: 13 }}>
-                  <div style={{ fontWeight: 600 }}>{a.name || "—"} {a.isSelf && <span style={{ color: "#8A897F", fontWeight: 500 }}>(you)</span>}</div>
-                  <div style={{ color: "#6B6A63" }}>{a.email}</div>
+                <div key={a.id} style={{ display: "grid", gridTemplateColumns: "1.8fr 2fr 1fr 90px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13 }}>
+                  <div style={{ fontWeight: 600 }}>{a.name || "—"} {a.isSelf && <span style={{ color: "var(--text-faint)", fontWeight: 500 }}>(you)</span>}</div>
+                  <div style={{ color: "var(--text-muted)" }}>{a.email}</div>
                   <div>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: a.isMaster ? "#F5B301" : "#F0EEE7", color: a.isMaster ? NAVY : "#6B6A63" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 999, background: a.isMaster ? "#F5B301" : "var(--chip-bg)", color: a.isMaster ? NAVY : "var(--text-muted)" }}>
                       {a.isMaster ? "Master" : "Admin"}
                     </span>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     {!a.isMaster && !a.isSelf && (
-                      <button onClick={() => removeAdmin(a.id, a.name || a.email)} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "6px 10px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>Remove</button>
+                      <button onClick={() => removeAdmin(a.id, a.name || a.email)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "6px 10px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#B3261E" }}>Remove</button>
                     )}
                   </div>
                 </div>
               ))}
-              {!admins.length && <div style={{ padding: 24, color: "#8A897F", fontSize: 13 }}>No admins yet.</div>}
+              {!admins.length && <div style={{ padding: 24, color: "var(--text-faint)", fontSize: 13 }}>No admins yet.</div>}
             </div>
             <DelegateAdminForm onCreated={loadAdmins} />
           </div>
         )}
       </div>
+      {editingTeacher && (
+        <EditTeacherModal
+          teacher={editingTeacher}
+          onClose={() => setEditingTeacher(null)}
+          onSaved={() => { setEditingTeacher(null); loadTeachers(); }}
+        />
+      )}
     </div>
   );
 }

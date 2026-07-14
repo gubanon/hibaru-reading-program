@@ -14,7 +14,7 @@ export default function Privacy() {
 
       <Section title="2. What we collect">
         <ul style={{ margin: 0, paddingLeft: 20 }}>
-          <li><b>Account info:</b> name, DepEd email, role (teacher/student/admin), sex, grade & section, school/division/region.</li>
+          <li><b>Account info:</b> name, email, role (teacher/student/admin), sex, grade & section, school/division/region.</li>
           <li><b>Classroom & assignment data:</b> classroom rosters, reading passages, comprehension questions, deadlines.</li>
           <li><b>Reading performance data:</b> reading time, words-per-minute, a speech-to-text transcript of monitored
           reading sessions, automatically detected miscues, comprehension quiz answers and scores.</li>

@@ -1,14 +1,19 @@
 export const NAVY = "#22335E";
 export const NAVY_DARK = "#1B2949";
 export const GOLD = "#F5B301";
-export const BG = "#F6F5F1";
-export const TEXT = "#26251F";
-export const MUTED = "#6B6A63";
-export const FAINT = "#8A897F";
-export const BORDER = "#E7E5DD";
-export const INPUT_BORDER = "#E0DED5";
-export const SUBTLE_BG = "#FAF9F5";
-export const CHIP_BG = "#F0EEE7";
+// Same brand navy in light mode, but a lighter legible blue in dark mode —
+// use this (not NAVY) for navy TEXT/borders sitting on a themed page/card
+// surface. Keep using NAVY for actual navy background fills (header bar,
+// solid buttons), which should stay literal navy in both themes.
+export const ACCENT = "var(--accent)";
+export const BG = "var(--page-bg)";
+export const TEXT = "var(--text)";
+export const MUTED = "var(--text-muted)";
+export const FAINT = "var(--text-faint)";
+export const BORDER = "var(--card-border)";
+export const INPUT_BORDER = "var(--input-border)";
+export const SUBTLE_BG = "var(--subtle-bg)";
+export const CHIP_BG = "var(--chip-bg)";
 
 export const GREEN = "oklch(0.55 0.13 155)";
 export const GREEN_BG = "oklch(0.93 0.05 155)";

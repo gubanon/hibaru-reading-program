@@ -35,7 +35,7 @@ function publicUser(u) {
 router.post("/signup", authLimiter, (req, res) => {
   const { name, email, password, agreeToTerms } = req.body || {};
   if (!name || !name.trim() || !email || !email.trim() || !password || password.length < 8) {
-    return res.status(400).json({ error: "Please provide your name, DepEd email, and a password of at least 8 characters." });
+    return res.status(400).json({ error: "Please provide your name, email, and a password of at least 8 characters." });
   }
   if (!agreeToTerms) {
     return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to create an account." });
@@ -153,6 +153,12 @@ router.post("/change-password", requireAuth, (req, res) => {
 });
 
 router.put("/me", requireAuth, (req, res) => {
+  // Teachers' identity details (name/email) are managed by an admin instead
+  // (see PUT /admin/teachers/:id) — keeps who's-allowed-to-be-a-teacher
+  // under admin oversight rather than self-service.
+  if (req.user.role === "teacher") {
+    return res.status(403).json({ error: "Contact your admin to update your account details." });
+  }
   const { surname, given, mi, sex, grade, email } = req.body || {};
   db.prepare(`
     UPDATE users SET surname = ?, given_name = ?, mi = ?, sex = ?, grade_section = ?, email = ?

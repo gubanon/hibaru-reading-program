@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { useSpeechRecognition } from "../../hooks/useSpeechRecognition";
 import { useCamera } from "../../hooks/useCamera";
-import { NAVY } from "../../theme";
+import { NAVY , ACCENT } from "../../theme";
 
 function timeText(secs) {
   const m = Math.floor(secs / 60), s = secs % 60;
@@ -36,10 +36,10 @@ export default function Read({ L, assignment, onFinished }) {
 
   return (
     <div style={{ display: "flex", gap: 18, alignItems: "start" }}>
-      <div style={{ flex: 1, background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 26 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: NAVY, letterSpacing: ".08em", marginBottom: 8 }}>{L.step2}</div>
+      <div style={{ flex: 1, background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 26 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, letterSpacing: ".08em", marginBottom: 8 }}>{L.step2}</div>
         <h2 style={{ margin: "0 0 14px", fontSize: 20, fontWeight: 700 }}>{assignment.title}</h2>
-        <div style={{ fontSize: 16.5, lineHeight: 2, color: "#26251F" }}>{assignment.passage}</div>
+        <div style={{ fontSize: 16.5, lineHeight: 2, color: "var(--text)" }}>{assignment.passage}</div>
       </div>
       <div style={{ width: 230, display: "flex", flexDirection: "column", gap: 12, position: "sticky", top: 84 }}>
         <div style={{ background: NAVY, borderRadius: 14, padding: 14, color: "#fff" }}>
@@ -61,10 +61,10 @@ export default function Read({ L, assignment, onFinished }) {
           {!supported && <div style={{ marginTop: 8, fontSize: 10.5, color: "#F5B301" }}>Speech recognition isn't supported in this browser — try Chrome or Edge for live transcription.</div>}
           {speechError && <div style={{ marginTop: 8, fontSize: 10.5, color: "#F5B301" }}>{speechError}</div>}
         </div>
-        <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 16, textAlign: "center" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#8A897F", letterSpacing: ".06em" }}>{L.timeLbl}</div>
+        <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 16, textAlign: "center" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".06em" }}>{L.timeLbl}</div>
           <div style={{ fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{timeText(seconds)}</div>
-          <div style={{ fontSize: 11.5, color: "#8A897F" }}>{L.limitLbl} {assignment.timeLimit}</div>
+          <div style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{L.limitLbl} {assignment.timeLimit}</div>
         </div>
         <button disabled={busy} onClick={finish} style={{ border: "none", cursor: "pointer", padding: 14, borderRadius: 11, background: "oklch(0.55 0.13 155)", color: "#fff", fontFamily: "inherit", fontSize: 14.5, fontWeight: 700 }}>{L.finished}</button>
       </div>

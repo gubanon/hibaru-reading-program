@@ -4,8 +4,8 @@ import { useAuth } from "../../auth/AuthContext";
 import { NAVY } from "../../theme";
 import { Toast } from "../../components/ui";
 
-const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 13.5, padding: "10px 12px", border: "1px solid #E0DED5", borderRadius: 9, outline: "none" };
-const label = { fontSize: 11, fontWeight: 700, color: "#6B6A63", letterSpacing: ".05em", marginBottom: 5 };
+const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 13.5, padding: "10px 12px", border: "1px solid var(--input-border)", borderRadius: 9, outline: "none" };
+const label = { fontSize: 11, fontWeight: 700, color: "var(--text-muted)", letterSpacing: ".05em", marginBottom: 5 };
 
 export default function Profile({ L, onBack }) {
   const { setUser } = useAuth();
@@ -28,17 +28,17 @@ export default function Profile({ L, onBack }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-        <button onClick={onBack} style={{ border: "1px solid #E0DED5", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>←</button>
+        <button onClick={onBack} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>←</button>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>👤 {L.myProfile}</h2>
       </div>
-      <div style={{ background: "#fff", border: "1px solid #E7E5DD", borderRadius: 14, padding: 26, maxWidth: 520 }}>
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 26, maxWidth: 520 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22 }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontSize: 20, fontWeight: 700 }}>
             {(p.given[0] || "") + (p.surname[0] || "")}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 16 }}>{p.given} {p.surname}</div>
-            <div style={{ fontSize: 12.5, color: "#8A897F" }}>{p.grade} · Taft National High School (303529)</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-faint)" }}>{p.grade} · Taft National High School (303529)</div>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr .5fr", gap: 10, marginBottom: 12 }}>
