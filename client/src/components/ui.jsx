@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NAVY, MUTED, INPUT_BORDER, BORDER, FAINT } from "../theme";
 
 export function Field({ label, children }) {
@@ -16,6 +17,30 @@ const inputStyle = {
 
 export function TextInput(props) {
   return <input {...props} style={{ ...inputStyle, ...(props.style || {}) }} />;
+}
+export function PasswordInput({ style, ...props }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        {...props}
+        type={visible ? "text" : "password"}
+        style={{ ...inputStyle, paddingRight: 56, ...(style || {}) }}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        aria-label={visible ? "Hide password" : "Show password"}
+        style={{
+          position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
+          border: "none", background: "none", cursor: "pointer", padding: "6px 8px",
+          fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: MUTED, letterSpacing: ".02em"
+        }}
+      >
+        {visible ? "Hide" : "Show"}
+      </button>
+    </div>
+  );
 }
 export function TextArea(props) {
   return <textarea {...props} style={{ ...inputStyle, minHeight: 80, resize: "vertical", lineHeight: 1.6, ...(props.style || {}) }} />;

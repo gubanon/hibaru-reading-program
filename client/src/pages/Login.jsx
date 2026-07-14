@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api";
 import { NAVY, GOLD } from "../theme";
-import { Field, TextInput, PrimaryButton } from "../components/ui";
+import { Field, TextInput, PasswordInput, PrimaryButton } from "../components/ui";
 
 const welcomeMap = {
   teacher: "Manage classrooms, assignments, and Phil-IRI reports.",
@@ -121,11 +121,11 @@ export default function Login() {
                 </button>
               </div>
 
-              <Field label="DEPED EMAIL">
+              <Field label={role === "teacher" ? "TEACHER EMAIL" : "STUDENT EMAIL"}>
                 <TextInput value={email} onChange={e => setEmail(e.target.value)} placeholder={role === "teacher" ? "teacher@deped.gov.ph" : "student@deped.gov.ph"} />
               </Field>
               <Field label="PASSWORD">
-                <TextInput type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" />
+                <PasswordInput value={pass} onChange={e => setPass(e.target.value)} placeholder="••••••••" />
               </Field>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
                 <button onClick={() => setMode("forgot")} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, color: NAVY }}>Forgot password?</button>
@@ -157,9 +157,9 @@ export default function Login() {
             <>
               <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Set your password</h2>
               <div style={{ fontSize: 13.5, color: "#6B6A63", marginBottom: 26 }}>Your teacher invited you to Project HIBARU. Set a password to finish creating your account.</div>
-              <Field label="DEPED EMAIL"><TextInput value={email} disabled style={{ background: "#F0EEE7" }} /></Field>
-              <Field label="NEW PASSWORD"><TextInput type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="At least 6 characters" /></Field>
-              <Field label="CONFIRM PASSWORD"><TextInput type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Retype password" /></Field>
+              <Field label="STUDENT EMAIL"><TextInput value={email} disabled style={{ background: "#F0EEE7" }} /></Field>
+              <Field label="NEW PASSWORD"><PasswordInput value={pass} onChange={e => setPass(e.target.value)} placeholder="At least 6 characters" /></Field>
+              <Field label="CONFIRM PASSWORD"><PasswordInput value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Retype password" /></Field>
               {termsCheckbox}
               {error && <div style={{ marginBottom: 14, fontSize: 13, color: "#B3261E", fontWeight: 600 }}>{error}</div>}
               <PrimaryButton disabled={busy} onClick={doClaim} style={{ width: "100%" }}>Set password &amp; sign in →</PrimaryButton>
@@ -174,8 +174,8 @@ export default function Login() {
                   <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Create teacher account</h2>
                   <div style={{ fontSize: 13.5, color: "#6B6A63", marginBottom: 26 }}>Your account will be reviewed and approved by the school admin.</div>
                   <Field label="FULL NAME"><TextInput value={suName} onChange={e => setSuName(e.target.value)} placeholder="e.g. Juan A. Dela Cruz" /></Field>
-                  <Field label="DEPED EMAIL"><TextInput value={suEmail} onChange={e => setSuEmail(e.target.value)} placeholder="teacher@deped.gov.ph" /></Field>
-                  <Field label="PASSWORD"><TextInput type="password" value={suPass} onChange={e => setSuPass(e.target.value)} placeholder="At least 8 characters" /></Field>
+                  <Field label="TEACHER EMAIL"><TextInput value={suEmail} onChange={e => setSuEmail(e.target.value)} placeholder="teacher@deped.gov.ph" /></Field>
+                  <Field label="PASSWORD"><PasswordInput value={suPass} onChange={e => setSuPass(e.target.value)} placeholder="At least 8 characters" /></Field>
                   {termsCheckbox}
                   {error && <div style={{ marginBottom: 14, fontSize: 13, color: "#B3261E", fontWeight: 600 }}>{error}</div>}
                   <PrimaryButton disabled={busy} onClick={doSignup} style={{ width: "100%" }}>Sign up →</PrimaryButton>
@@ -197,7 +197,7 @@ export default function Login() {
                 <>
                   <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700 }}>Reset password</h2>
                   <div style={{ fontSize: 13.5, color: "#6B6A63", marginBottom: 26 }}>Enter your DepEd email and we'll send you a reset link.</div>
-                  <Field label="DEPED EMAIL"><TextInput value={fpEmail} onChange={e => setFpEmail(e.target.value)} placeholder="name@deped.gov.ph" /></Field>
+                  <Field label={role === "teacher" ? "TEACHER EMAIL" : "STUDENT EMAIL"}><TextInput value={fpEmail} onChange={e => setFpEmail(e.target.value)} placeholder="name@deped.gov.ph" /></Field>
                   <PrimaryButton disabled={busy} onClick={doForgot} style={{ width: "100%" }}>Send reset link →</PrimaryButton>
                 </>
               ) : (

@@ -106,35 +106,46 @@ function randomPassword() {
   return crypto.randomBytes(9).toString("base64url");
 }
 
-function seedAdmin({ email, password, generated, surname, given, position }) {
+function seedAdmin({ email, password, explicit, surname, given, position }) {
   const emailNorm = email.trim().toLowerCase();
   const existing = db.prepare("SELECT id, password_hash FROM users WHERE email = ?").get(emailNorm);
-  if (existing) return;
   // A higher bcrypt cost factor for admin accounts specifically — these are
   // logged into far less often than teacher/student accounts, so the extra
   // hashing time is a worthwhile tradeoff against offline cracking of a
   // leaked hash.
+  if (existing) {
+    // The env var is authoritative whenever it's actually set — this keeps
+    // the account in sync even if it was first created before the real
+    // password env var existed (e.g. left blank during initial host setup),
+    // which would otherwise permanently strand it on a one-time generated
+    // password. Admins have no in-app "change password" flow, so this env
+    // var is the only way to rotate one.
+    if (explicit) {
+      db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(bcrypt.hashSync(password, 12), existing.id);
+    }
+    return;
+  }
   db.prepare(
     `INSERT INTO users (id, role, email, password_hash, status, surname, given_name, position, terms_accepted_at, created_at)
      VALUES (?, 'admin', ?, ?, 'active', ?, ?, ?, ?, ?)`
   ).run(nanoid(), emailNorm, bcrypt.hashSync(password, 12), surname, given, position, Date.now(), Date.now());
-  if (generated) {
+  if (!explicit) {
     console.warn(`[hibaru] No password env var set for ${emailNorm} — generated a one-time password: ${password}`);
     console.warn("[hibaru] Set it permanently via server/.env instead (see .env.example) so it doesn't change on every fresh DB.");
   }
 }
 
 function seed() {
-  const adminPassword = process.env.ADMIN_PASSWORD || randomPassword();
+  const adminPasswordEnv = process.env.ADMIN_PASSWORD;
   seedAdmin({
     email: process.env.ADMIN_EMAIL || "jinodocena11@gmail.com",
-    password: adminPassword, generated: !process.env.ADMIN_PASSWORD,
+    password: adminPasswordEnv || randomPassword(), explicit: !!adminPasswordEnv,
     surname: "Docena", given: "Jino", position: "School Head"
   });
-  const masterPassword = process.env.MASTER_ADMIN_PASSWORD || randomPassword();
+  const masterPasswordEnv = process.env.MASTER_ADMIN_PASSWORD;
   seedAdmin({
     email: process.env.MASTER_ADMIN_USERNAME || "biskotso",
-    password: masterPassword, generated: !process.env.MASTER_ADMIN_PASSWORD,
+    password: masterPasswordEnv || randomPassword(), explicit: !!masterPasswordEnv,
     surname: "", given: "Master Admin", position: "Master Administrator"
   });
 }
