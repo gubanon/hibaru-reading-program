@@ -25,3 +25,10 @@ services:
         sync: false
       - key: MASTER_ADMIN_PASSWORD
         sync: false
+      # Turso (remote libSQL) connection — without these two, the server
+      # falls back to a local SQLite file, which does NOT survive a Render
+      # redeploy. Set these to make the database persistent. See DEPLOY.md.
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false

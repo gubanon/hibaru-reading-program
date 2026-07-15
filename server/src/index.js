@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-require("./db"); // ensure DB + seed run before routes touch it
+const db = require("./db");
 
 const { router: authRouter } = require("./routes/auth");
 const adminRouter = require("./routes/admin");
@@ -39,4 +39,14 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`HIBARU server listening on http://localhost:${PORT}`));
+// The DB connection (and Turso in production) is async now, so the schema
+// and admin seeding must finish before the server starts accepting
+// requests — otherwise the very first request could race the migration.
+db.init()
+  .then(() => {
+    app.listen(PORT, () => console.log(`HIBARU server listening on http://localhost:${PORT}`));
+  })
+  .catch(err => {
+    console.error("[hibaru] Failed to initialize the database:", err);
+    process.exit(1);
+  });

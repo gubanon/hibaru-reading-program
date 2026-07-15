@@ -22,13 +22,16 @@ npm run dev
 Open `http://localhost:5173`. The Vite dev server proxies `/api/*` to the
 backend, so both must be running.
 
-Data lives in `server/data.db` (SQLite, created automatically). Delete it to
-reset to a blank install.
+Data lives in `server/data.db` (SQLite, created automatically) when running
+locally. Delete it to reset to a blank install. In production, set
+`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` to point at a hosted
+[Turso](https://turso.tech) database instead — otherwise data does not
+survive a redeploy. See DEPLOY.md.
 
 ## Deploying for a teacher pilot
 
-See **[DEPLOY.md](DEPLOY.md)** — free hosting on Fly.io (backend, persistent
-volume for the SQLite file) + Vercel (frontend), step by step.
+See **[DEPLOY.md](DEPLOY.md)** — free hosting on Netlify (frontend) + Render
+(backend) + Turso (database), step by step.
 
 ## Accounts
 
@@ -117,10 +120,11 @@ support, and the UI shows a fallback notice when it's unavailable.
 
 Before deploying for real: copy `server/.env.example` to `server/.env` and
 set real values for `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_PASSWORD`, and
-`MASTER_ADMIN_PASSWORD` — the defaults baked into source are for local dev
-only and are not a secret (anyone with repo access can read them). Also put
-the server behind HTTPS and review the `server/data.db` backup/retention
-plan.
+`MASTER_ADMIN_PASSWORD` (if these are left unset, the server generates a
+random one-time password and logs it once — it does not fall back to a
+fixed default). Also put the server behind HTTPS and set
+`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` so data survives redeploys — see
+DEPLOY.md.
 
 ## Terms & Conditions / Privacy Policy
 
@@ -137,8 +141,8 @@ account is created (`agreeToTerms`, enforced server-side too, with an
 ## Project layout
 
 ```
-server/   Express API, SQLite schema (server/src/db.js), DOCX generation,
-          miscue analysis
+server/   Express API, SQLite/Turso schema (server/src/db.js), DOCX
+          generation, miscue analysis
 client/   React SPA — pages/admin, pages/teacher, pages/student mirror the
           three consoles from the design
 ```

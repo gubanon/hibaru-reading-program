@@ -44,13 +44,13 @@ function deriveVocab(passage) {
   return picked.map(w => ({ word: w, def: "as used in the passage", defFil: "ayon sa gamit sa binasa" }));
 }
 
-function loadAssignment(id) {
-  const a = db.prepare("SELECT * FROM assignments WHERE id = ?").get(id);
+async function loadAssignment(id) {
+  const a = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(id);
   if (!a) return null;
-  const questions = db.prepare("SELECT * FROM questions WHERE assignment_id = ? ORDER BY seq").all(id)
-    .map(q => ({ id: q.id, text: q.text, options: JSON.parse(q.options), correct: q.correct_index }));
-  const vocab = db.prepare("SELECT * FROM vocab_words WHERE assignment_id = ? ORDER BY seq").all(id)
-    .map(v => ({ word: v.word, def: v.def, defFil: v.def_fil }));
+  const questionRows = await db.prepare("SELECT * FROM questions WHERE assignment_id = ? ORDER BY seq").all(id);
+  const questions = questionRows.map(q => ({ id: q.id, text: q.text, options: JSON.parse(q.options), correct: q.correct_index }));
+  const vocabRows = await db.prepare("SELECT * FROM vocab_words WHERE assignment_id = ? ORDER BY seq").all(id);
+  const vocab = vocabRows.map(v => ({ word: v.word, def: v.def, defFil: v.def_fil }));
   return {
     id: a.id, classId: a.classroom_id, title: a.title, instructions: a.instructions, passage: a.passage,
     genre: a.genre, attempts: a.attempts, timeLimit: a.time_limit, sensitivity: a.sensitivity,
@@ -74,88 +74,103 @@ function validateQuestions(questions) {
   return null;
 }
 
-function insertQuestions(assignmentId, questions) {
-  (questions || []).forEach((q, i) => {
-    db.prepare("INSERT INTO questions (id, assignment_id, seq, text, options, correct_index) VALUES (?, ?, ?, ?, ?, ?)")
+async function insertQuestions(assignmentId, questions) {
+  let i = 0;
+  for (const q of (questions || [])) {
+    await db.prepare("INSERT INTO questions (id, assignment_id, seq, text, options, correct_index) VALUES (?, ?, ?, ?, ?, ?)")
       .run(nanoid(), assignmentId, i, q.text.trim(), JSON.stringify(q.options.map(o => o.trim())), q.correct);
-  });
+    i++;
+  }
 }
 
-function ownsClassroom(teacherId, classroomId) {
-  return !!db.prepare("SELECT id FROM classrooms WHERE id = ? AND teacher_id = ?").get(classroomId, teacherId);
+async function insertVocab(assignmentId, passage) {
+  const words = deriveVocab(passage);
+  let i = 0;
+  for (const v of words) {
+    await db.prepare("INSERT INTO vocab_words (id, assignment_id, seq, word, def, def_fil) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(nanoid(), assignmentId, i, v.word, v.def, v.defFil);
+    i++;
+  }
 }
-function ownsAssignment(teacherId, assignmentId) {
-  return !!db.prepare("SELECT id FROM assignments WHERE id = ? AND teacher_id = ?").get(assignmentId, teacherId);
+
+async function ownsClassroom(teacherId, classroomId) {
+  return !!(await db.prepare("SELECT id FROM classrooms WHERE id = ? AND teacher_id = ?").get(classroomId, teacherId));
+}
+async function ownsAssignment(teacherId, assignmentId) {
+  return !!(await db.prepare("SELECT id FROM assignments WHERE id = ? AND teacher_id = ?").get(assignmentId, teacherId));
 }
 
 // ===== Classrooms =====
-router.get("/classrooms", (req, res) => {
-  const classes = db.prepare("SELECT * FROM classrooms WHERE teacher_id = ? ORDER BY created_at").all(req.user.id);
-  const out = classes.map(c => {
-    const students = db.prepare(`
+router.get("/classrooms", async (req, res) => {
+  const classes = await db.prepare("SELECT * FROM classrooms WHERE teacher_id = ? ORDER BY created_at").all(req.user.id);
+  const out = [];
+  for (const c of classes) {
+    const students = await db.prepare(`
       SELECT u.* FROM classroom_students cs JOIN users u ON u.id = cs.student_id
       WHERE cs.classroom_id = ? ORDER BY u.surname
     `).all(c.id);
-    const assignmentCount = db.prepare("SELECT COUNT(*) n FROM assignments WHERE classroom_id = ?").get(c.id).n;
-    return {
+    const assignmentCount = (await db.prepare("SELECT COUNT(*) n FROM assignments WHERE classroom_id = ?").get(c.id)).n;
+    out.push({
       id: c.id, name: c.name, assignmentCount,
       students: students.map(s => ({
         id: s.id, surname: s.surname, given: s.given_name, mi: s.mi, sex: s.sex, grade: s.grade_section, email: s.email
       }))
-    };
-  });
+    });
+  }
   res.json({ classrooms: out });
 });
 
-router.post("/classrooms", (req, res) => {
+router.post("/classrooms", async (req, res) => {
   const name = (req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Classroom name is required." });
   const id = nanoid();
-  db.prepare("INSERT INTO classrooms (id, teacher_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, req.user.id, name, Date.now());
+  await db.prepare("INSERT INTO classrooms (id, teacher_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, req.user.id, name, Date.now());
   res.json({ id, name });
 });
 
-router.post("/classrooms/:id/students", (req, res) => {
+router.post("/classrooms/:id/students", async (req, res) => {
   const classId = req.params.id;
-  if (!ownsClassroom(req.user.id, classId)) return res.status(404).json({ error: "Classroom not found." });
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
   const { surname, given, mi, sex, grade, email } = req.body || {};
   if (!surname?.trim() || !given?.trim()) return res.status(400).json({ error: "Please enter at least Surname and Given Name." });
 
-  const cls = db.prepare("SELECT name FROM classrooms WHERE id = ?").get(classId);
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(classId);
   const emailNorm = (email || "").trim().toLowerCase() || `${given}.${surname}.${nanoid(5)}@pending.local`.toLowerCase().replace(/\s+/g, "");
-  let student = db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
+  let student = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
   if (!student) {
     const id = nanoid();
-    db.prepare(`
+    await db.prepare(`
       INSERT INTO users (id, role, email, password_hash, status, surname, given_name, mi, sex, grade_section, created_at)
       VALUES (?, 'student', ?, 'UNCLAIMED', 'active', ?, ?, ?, ?, ?, ?)
     `).run(id, emailNorm, surname.trim(), given.trim(), (mi || "").trim(), sex || "M", grade?.trim() || cls.name, Date.now());
-    student = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+    student = await db.prepare("SELECT * FROM users WHERE id = ?").get(id);
   }
-  db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(classId, student.id);
+  await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(classId, student.id);
   res.json({ ok: true });
 });
 
 router.get("/classrooms/:id/docx", async (req, res) => {
   const classId = req.params.id;
-  if (!ownsClassroom(req.user.id, classId)) return res.status(404).json({ error: "Classroom not found." });
-  const cls = db.prepare("SELECT * FROM classrooms WHERE id = ?").get(classId);
-  const asgRow = db.prepare("SELECT * FROM assignments WHERE classroom_id = ? ORDER BY created_at DESC LIMIT 1").get(classId);
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  const cls = await db.prepare("SELECT * FROM classrooms WHERE id = ?").get(classId);
+  const asgRow = await db.prepare("SELECT * FROM assignments WHERE classroom_id = ? ORDER BY created_at DESC LIMIT 1").get(classId);
   if (!asgRow) return res.status(400).json({ error: "This classroom has no assignments yet." });
-  const asg = loadAssignment(asgRow.id);
-  const students = db.prepare(`
+  const asg = await loadAssignment(asgRow.id);
+  const students = await db.prepare(`
     SELECT u.* FROM classroom_students cs JOIN users u ON u.id = cs.student_id WHERE cs.classroom_id = ? ORDER BY u.surname
   `).all(classId);
 
-  function withMetrics(s) {
-    const sub = db.prepare("SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?").get(asg.id, s.id);
+  async function withMetrics(s) {
+    const sub = await db.prepare("SELECT * FROM submissions WHERE assignment_id = ? AND student_id = ?").get(asg.id, s.id);
     if (!sub || sub.status !== "turned-in") return { name: studentName(s), status: sub ? sub.status : "not-started", metrics: null };
     const miscues = JSON.parse(sub.miscues);
     const m = metricsFor({ words: asg.wordCount, miscues, seconds: sub.seconds, correct: sub.correct_count, items: asg.questions.length });
     return { name: studentName(s), status: sub.status, metrics: m, seconds: sub.seconds };
   }
-  const males = students.filter(s => s.sex === "M").map(withMetrics);
-  const females = students.filter(s => s.sex !== "M").map(withMetrics);
+  const males = [];
+  for (const s of students.filter(s => s.sex === "M")) males.push(await withMetrics(s));
+  const females = [];
+  for (const s of students.filter(s => s.sex !== "M")) females.push(await withMetrics(s));
 
   const buf = await buildConsolidatedDoc(cls.name, asg, males, females);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
@@ -164,46 +179,43 @@ router.get("/classrooms/:id/docx", async (req, res) => {
 });
 
 // ===== Assignments =====
-router.post("/assignments", (req, res) => {
+router.post("/assignments", async (req, res) => {
   const { title, instructions, passage, classId, genre, attempts, timeLimit, sensitivity, deadline, questions } = req.body || {};
   if (!title?.trim() || !passage?.trim()) return res.status(400).json({ error: "Please add a title and passage." });
-  if (!ownsClassroom(req.user.id, classId)) return res.status(400).json({ error: "Invalid target classroom." });
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(400).json({ error: "Invalid target classroom." });
   const qError = validateQuestions(questions);
   if (qError) return res.status(400).json({ error: qError });
 
   const id = nanoid();
   const now = Date.now();
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO assignments (id, classroom_id, teacher_id, title, instructions, passage, genre, attempts, time_limit, sensitivity, deadline_iso, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, classId, req.user.id, title.trim(), instructions || "Read the passage aloud clearly.", passage, genre || "Non-Fiction", attempts || "3", timeLimit || "10 minutes", sensitivity || "Default", deadline || "", now);
 
-  insertQuestions(id, questions);
-  deriveVocab(passage).forEach((v, i) => {
-    db.prepare("INSERT INTO vocab_words (id, assignment_id, seq, word, def, def_fil) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(nanoid(), id, i, v.word, v.def, v.defFil);
-  });
+  await insertQuestions(id, questions);
+  await insertVocab(id, passage);
 
   // seed a not-started submission row for every student currently in the class
-  const students = db.prepare("SELECT student_id FROM classroom_students WHERE classroom_id = ?").all(classId);
-  students.forEach(s => {
-    db.prepare("INSERT OR IGNORE INTO submissions (id, assignment_id, student_id, status) VALUES (?, ?, ?, 'not-started')").run(nanoid(), id, s.student_id);
-  });
+  const students = await db.prepare("SELECT student_id FROM classroom_students WHERE classroom_id = ?").all(classId);
+  for (const s of students) {
+    await db.prepare("INSERT OR IGNORE INTO submissions (id, assignment_id, student_id, status) VALUES (?, ?, ?, 'not-started')").run(nanoid(), id, s.student_id);
+  }
 
   res.json({ id });
 });
 
-router.get("/assignments", (req, res) => {
-  const rows = db.prepare("SELECT * FROM assignments WHERE teacher_id = ? ORDER BY created_at DESC").all(req.user.id);
+router.get("/assignments", async (req, res) => {
+  const rows = await db.prepare("SELECT * FROM assignments WHERE teacher_id = ? ORDER BY created_at DESC").all(req.user.id);
   const groups = [];
-  rows.forEach(a => {
+  for (const a of rows) {
     const d = new Date(a.created_at);
     const key = d.toLocaleDateString("en-US", { month: "long", year: "numeric" }).toUpperCase();
     let g = groups.find(x => x.name === key);
     if (!g) { g = { name: key, items: [] }; groups.push(g); }
-    const cls = db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classroom_id);
-    const subs = db.prepare("SELECT status, submitted_at FROM submissions WHERE assignment_id = ?").all(a.id);
-    const qCount = db.prepare("SELECT COUNT(*) n FROM questions WHERE assignment_id = ?").get(a.id).n;
+    const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classroom_id);
+    const subs = await db.prepare("SELECT status, submitted_at FROM submissions WHERE assignment_id = ?").all(a.id);
+    const qCount = (await db.prepare("SELECT COUNT(*) n FROM questions WHERE assignment_id = ?").get(a.id)).n;
     const done = subs.filter(s => s.status === "turned-in");
     let doneText;
     if (subs.length === 0) doneText = "No submissions yet";
@@ -221,43 +233,40 @@ router.get("/assignments", (req, res) => {
       complete: done.length > 0 && done.length === subs.length,
       partial: done.length > 0 && done.length < subs.length
     });
-  });
+  }
   res.json({ groups });
 });
 
-router.get("/assignments/:id", (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const cls = db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classId);
+router.get("/assignments/:id", async (req, res) => {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classId);
   res.json({ assignment: { ...a, className: cls?.name || "" } });
 });
 
-router.put("/assignments/:id", (req, res) => {
+router.put("/assignments/:id", async (req, res) => {
   const id = req.params.id;
-  if (!ownsAssignment(req.user.id, id)) return res.status(404).json({ error: "Assignment not found." });
+  if (!(await ownsAssignment(req.user.id, id))) return res.status(404).json({ error: "Assignment not found." });
   const { title, instructions, passage, genre, attempts, timeLimit, sensitivity, deadlineISO, questions } = req.body || {};
   if (!title?.trim() || !passage?.trim()) return res.status(400).json({ error: "Title and passage are required." });
   const qError = validateQuestions(questions);
   if (qError) return res.status(400).json({ error: qError });
-  db.prepare(`
+  await db.prepare(`
     UPDATE assignments SET title=?, instructions=?, passage=?, genre=?, attempts=?, time_limit=?, sensitivity=?, deadline_iso=?, updated_at=?
     WHERE id = ?
   `).run(title.trim(), instructions || "", passage, genre, attempts, timeLimit, sensitivity, deadlineISO || "", Date.now(), id);
 
-  db.prepare("DELETE FROM questions WHERE assignment_id = ?").run(id);
-  insertQuestions(id, questions);
-  db.prepare("DELETE FROM vocab_words WHERE assignment_id = ?").run(id);
-  deriveVocab(passage).forEach((v, i) => {
-    db.prepare("INSERT INTO vocab_words (id, assignment_id, seq, word, def, def_fil) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(nanoid(), id, i, v.word, v.def, v.defFil);
-  });
+  await db.prepare("DELETE FROM questions WHERE assignment_id = ?").run(id);
+  await insertQuestions(id, questions);
+  await db.prepare("DELETE FROM vocab_words WHERE assignment_id = ?").run(id);
+  await insertVocab(id, passage);
   res.json({ ok: true });
 });
 
 router.get("/assignments/:id/docx", async (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const cls = db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classId);
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(a.classId);
   const buf = await buildAssignmentDoc({ ...a, deadline: a.deadlineISO }, cls?.name);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   res.setHeader("Content-Disposition", `attachment; filename="Assignment - ${a.title}.docx"`);
@@ -295,10 +304,10 @@ router.post("/parse-questions", handleUpload, async (req, res) => {
 });
 
 // ===== Progress Monitor / Miscue Report / Analytics =====
-router.get("/assignments/:id/progress", (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const subs = db.prepare(`
+router.get("/assignments/:id/progress", async (req, res) => {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const subs = await db.prepare(`
     SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section FROM submissions s
     JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? ORDER BY u.surname
   `).all(a.id);
@@ -312,21 +321,22 @@ router.get("/assignments/:id/progress", (req, res) => {
     };
   });
   const turnedIn = rows.filter(r => r.status === "turned-in");
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id=?").get(a.classId);
   res.json({
-    title: a.title, deadline: a.deadlineISO, className: db.prepare("SELECT name FROM classrooms WHERE id=?").get(a.classId)?.name,
+    title: a.title, deadline: a.deadlineISO, className: cls?.name,
     completionPct: rows.length ? Math.round(turnedIn.length / rows.length * 100) : 0,
     rows
   });
 });
 
-function fullReport(submissionId, teacherId) {
-  const sub = db.prepare(`
+async function fullReport(submissionId, teacherId) {
+  const sub = await db.prepare(`
     SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section, u.email FROM submissions s
     JOIN users u ON u.id = s.student_id WHERE s.id = ?
   `).get(submissionId);
   if (!sub) return null;
-  const a = loadAssignment(sub.assignment_id);
-  if (!ownsAssignment(teacherId, a.id)) return null;
+  const a = await loadAssignment(sub.assignment_id);
+  if (!(await ownsAssignment(teacherId, a.id))) return null;
   const miscues = JSON.parse(sub.miscues || "{}");
   const marked = JSON.parse(sub.marked || "[]");
   const m = metricsFor({ words: a.wordCount, miscues, seconds: sub.seconds, correct: sub.correct_count, items: a.questions.length });
@@ -340,16 +350,16 @@ function fullReport(submissionId, teacherId) {
   };
 }
 
-router.get("/submissions/:id/report", (req, res) => {
-  const report = fullReport(req.params.id, req.user.id);
+router.get("/submissions/:id/report", async (req, res) => {
+  const report = await fullReport(req.params.id, req.user.id);
   if (!report) return res.status(404).json({ error: "Report not found." });
   res.json({ report });
 });
 
-router.get("/assignments/:id/analytics", (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const subs = db.prepare("SELECT * FROM submissions WHERE assignment_id = ?").all(a.id);
+router.get("/assignments/:id/analytics", async (req, res) => {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const subs = await db.prepare("SELECT * FROM submissions WHERE assignment_id = ?").all(a.id);
   const turnedIn = subs.filter(s => s.status === "turned-in");
   const metrics = turnedIn.map(s => metricsFor({ words: a.wordCount, miscues: JSON.parse(s.miscues || "{}"), seconds: s.seconds, correct: s.correct_count, items: a.questions.length }));
   const avg = arr => arr.length ? Math.round(arr.reduce((x, y) => x + y, 0) / arr.length) : 0;
@@ -365,33 +375,32 @@ router.get("/assignments/:id/analytics", (req, res) => {
   });
 });
 
-router.get("/assignments/:id/reports-all", (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const subs = db.prepare("SELECT id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
-  const records = subs.map(s => fullReport(s.id, req.user.id));
+router.get("/assignments/:id/reports-all", async (req, res) => {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const subs = await db.prepare("SELECT id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
+  const records = [];
+  for (const s of subs) records.push(await fullReport(s.id, req.user.id));
   res.json({ records });
 });
 
 router.get("/assignments/:id/reports-all.docx", async (req, res) => {
-  if (!ownsAssignment(req.user.id, req.params.id)) return res.status(404).json({ error: "Assignment not found." });
-  const a = loadAssignment(req.params.id);
-  const subIds = db.prepare("SELECT id, student_id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
-  const { MISCUE_TYPES } = require("../docx");
-  const records = subIds.map(({ id }) => {
-    const r = fullReport(id, req.user.id);
-    const wrongIdx = {};
-    r.questions.forEach((q, i) => { if (q.chosen !== q.correct) wrongIdx[i] = true; });
-    return {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const subIds = await db.prepare("SELECT id, student_id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
+  const { MISCUE_TYPES, buildForm3BulkDoc } = require("../docx");
+  const records = [];
+  for (const { id } of subIds) {
+    const r = await fullReport(id, req.user.id);
+    records.push({
       name: r.name, grade: r.grade, school: "Taft National High School (303529)", division: "Eastern Samar", region: "Region VIII – Eastern Visayas",
       selection: r.assignment, minutes: Math.floor(r.seconds / 60) + ":" + String(r.seconds % 60).padStart(2, "0"), seconds: r.seconds,
       wpm: r.metrics.wpm, correct: r.metrics.correct, items: r.metrics.items, acc: r.metrics.acc, compLevel: r.metrics.compLevel,
       level: r.metrics.level, tm: r.metrics.tm, words: r.metrics.words, score: r.metrics.score, profile: r.metrics.profile,
       miscueRows: MISCUE_TYPES.map((t, i) => ({ n: i + 1, label: t.label, fil: t.fil, count: r.miscues[t.key] || 0 })),
       responses: r.questions.map(q => ({ n: q.n, letter: q.chosen != null ? ["A", "B", "C", "D"][q.chosen] : "—", mark: q.chosen === q.correct ? "✓" : "✗" }))
-    };
-  });
-  const { buildForm3BulkDoc } = require("../docx");
+    });
+  }
   const buf = await buildForm3BulkDoc(records);
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   res.setHeader("Content-Disposition", `attachment; filename="Phil-IRI Form 3 - ${a.title}.docx"`);

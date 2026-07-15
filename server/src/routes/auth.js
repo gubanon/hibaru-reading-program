@@ -32,7 +32,7 @@ function publicUser(u) {
 }
 
 // Teacher self-signup — goes in as 'pending', admin must approve.
-router.post("/signup", authLimiter, (req, res) => {
+router.post("/signup", authLimiter, async (req, res) => {
   const { name, email, password, agreeToTerms } = req.body || {};
   if (!name || !name.trim() || !email || !email.trim() || !password || password.length < 8) {
     return res.status(400).json({ error: "Please provide your name, email, and a password of at least 8 characters." });
@@ -41,14 +41,14 @@ router.post("/signup", authLimiter, (req, res) => {
     return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to create an account." });
   }
   const emailNorm = email.trim().toLowerCase();
-  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(emailNorm);
+  const existing = await db.prepare("SELECT id FROM users WHERE email = ?").get(emailNorm);
   if (existing) return res.status(409).json({ error: "An account with that email already exists." });
 
   const parts = name.trim().split(/\s+/);
   const given = parts[0] || name.trim();
   const surname = parts.length > 1 ? parts[parts.length - 1] : "";
   const id = nanoid();
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO users (id, role, email, password_hash, status, surname, given_name, position, terms_accepted_at, created_at)
     VALUES (?, 'teacher', ?, ?, 'pending', ?, ?, 'Teacher', ?, ?)
   `).run(id, emailNorm, bcrypt.hashSync(password, 10), surname, given, Date.now(), Date.now());
@@ -61,7 +61,7 @@ function lockMessage(retryAfterMs) {
   return `Too many failed attempts. Please wait ${mins} minute${mins === 1 ? "" : "s"} and try again.`;
 }
 
-router.post("/login", authLimiter, (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   const { email, password, role } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: "Email and password are required." });
   const emailNorm = email.trim().toLowerCase();
@@ -74,7 +74,7 @@ router.post("/login", authLimiter, (req, res) => {
     return res.status(429).json({ error: lockMessage(lock.retryAfterMs), code: "LOCKED", retryAfterMs: lock.retryAfterMs });
   }
 
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
+  const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
   if (!user) {
     const entry = loginAttempts.recordFailure(emailNorm);
     if (entry.lockedUntil) return res.status(429).json({ error: lockMessage(loginAttempts.LOCKOUT_MS), code: "LOCKED", retryAfterMs: loginAttempts.LOCKOUT_MS });
@@ -108,16 +108,16 @@ router.post("/login", authLimiter, (req, res) => {
 
 // Student accounts are created via teacher invite (no password yet) — first
 // login sets the password for that invited email.
-router.post("/student-claim", authLimiter, (req, res) => {
+router.post("/student-claim", authLimiter, async (req, res) => {
   const { email, password, agreeToTerms } = req.body || {};
   if (!email || !password || password.length < 6) return res.status(400).json({ error: "Email and a password of at least 6 characters are required." });
   if (!agreeToTerms) return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to continue." });
   const emailNorm = email.trim().toLowerCase();
-  const user = db.prepare("SELECT * FROM users WHERE email = ? AND role = 'student'").get(emailNorm);
+  const user = await db.prepare("SELECT * FROM users WHERE email = ? AND role = 'student'").get(emailNorm);
   if (!user) return res.status(404).json({ error: "No student invite found for that email." });
   if (user.password_hash !== "UNCLAIMED") return res.status(409).json({ error: "This account already has a password — please sign in." });
-  db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), user.id);
-  const updated = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
+  await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), user.id);
+  const updated = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
   res.json({ token: signToken(updated), user: publicUser(updated) });
 });
 
@@ -127,8 +127,8 @@ router.post("/forgot", authLimiter, (req, res) => {
   res.json({ ok: true, message: "If an account exists for that email, a password reset link is on its way." });
 });
 
-router.get("/me", requireAuth, (req, res) => {
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+router.get("/me", requireAuth, async (req, res) => {
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
   if (!user) return res.status(404).json({ error: "Account not found." });
   res.json({ user: publicUser(user) });
 });
@@ -138,21 +138,21 @@ router.get("/me", requireAuth, (req, res) => {
 // rather than a permanent secret that has to keep living in server/.env —
 // once you change your password here, the account is marked password_owned
 // and the seed step on db.js will never overwrite it from the env var again.
-router.post("/change-password", requireAuth, (req, res) => {
+router.post("/change-password", requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
   if (!currentPassword || !newPassword || newPassword.length < 6) {
     return res.status(400).json({ error: "Please provide your current password and a new password of at least 6 characters." });
   }
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
   if (!user || user.password_hash === "UNCLAIMED" || !bcrypt.compareSync(currentPassword, user.password_hash)) {
     return res.status(401).json({ error: "Current password is incorrect." });
   }
   const cost = user.role === "admin" ? 12 : 10;
-  db.prepare("UPDATE users SET password_hash = ?, password_owned = 1 WHERE id = ?").run(bcrypt.hashSync(newPassword, cost), user.id);
+  await db.prepare("UPDATE users SET password_hash = ?, password_owned = 1 WHERE id = ?").run(bcrypt.hashSync(newPassword, cost), user.id);
   res.json({ ok: true });
 });
 
-router.put("/me", requireAuth, (req, res) => {
+router.put("/me", requireAuth, async (req, res) => {
   // Teachers' identity details (name/email) are managed by an admin instead
   // (see PUT /admin/teachers/:id) — keeps who's-allowed-to-be-a-teacher
   // under admin oversight rather than self-service.
@@ -160,11 +160,11 @@ router.put("/me", requireAuth, (req, res) => {
     return res.status(403).json({ error: "Contact your admin to update your account details." });
   }
   const { surname, given, mi, sex, grade, email } = req.body || {};
-  db.prepare(`
+  await db.prepare(`
     UPDATE users SET surname = ?, given_name = ?, mi = ?, sex = ?, grade_section = ?, email = ?
     WHERE id = ?
   `).run(surname || "", given || "", mi || "", sex || "M", grade || "", (email || "").trim().toLowerCase(), req.user.id);
-  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
   res.json({ user: publicUser(user) });
 });
 
