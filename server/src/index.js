@@ -11,6 +11,11 @@ const studentRouter = require("./routes/student");
 
 const app = express();
 app.disable("x-powered-by");
+// Render (and most PaaS hosts) put the app behind a reverse proxy, so the
+// real client IP only arrives via X-Forwarded-For. Without this,
+// express-rate-limit can't safely trust that header and refuses to start
+// rate limiting at all — trust exactly one hop, not an arbitrary chain.
+app.set("trust proxy", 1);
 app.use(helmet({
   // The API serves JSON + file downloads, not HTML pages of its own, so a
   // strict default CSP would only get in the way — the frontend origin sets

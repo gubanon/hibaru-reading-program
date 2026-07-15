@@ -12,7 +12,8 @@ export function Field({ label, children }) {
 
 const inputStyle = {
   width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14,
-  padding: "13px 14px", border: `1.5px solid ${INPUT_BORDER}`, borderRadius: 11, outline: "none", background: "var(--card-bg)"
+  padding: "13px 14px", border: `1.5px solid ${INPUT_BORDER}`, borderRadius: 11, outline: "none",
+  background: "var(--card-bg)", color: "var(--text)"
 };
 
 export function TextInput(props) {
