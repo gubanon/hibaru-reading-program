@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { FAINT, NAVY , ACCENT } from "../../theme";
+import { FAINT, NAVY, ACCENT } from "../../theme";
 import { Toast } from "../../components/ui";
+import QuestionEditor from "../../components/QuestionEditor";
+import PassageUpload from "../../components/PassageUpload";
 
 function wordCount(text) {
   return (text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -9,7 +11,6 @@ function wordCount(text) {
 
 const fieldLabel = { fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 5 };
 const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14, padding: "10px 12px", border: "1px solid var(--input-border)", borderRadius: 8, outline: "none" };
-const dropZone = { flex: 1, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 11.5, color: "var(--text-faint-2)", fontFamily: "monospace", textAlign: "center", background: "repeating-linear-gradient(45deg,#FCFBF8,#FCFBF8 8px,#F6F5F0 8px,#F6F5F0 16px)" };
 
 export default function NewAssignmentTab({ onCreated }) {
   const [classes, setClasses] = useState([]);
@@ -23,10 +24,8 @@ export default function NewAssignmentTab({ onCreated }) {
   const [sensitivity, setSensitivity] = useState("Default");
   const [deadline, setDeadline] = useState("");
   const [questions, setQuestions] = useState([]);
-  const [newQ, setNewQ] = useState("");
   const [error, setError] = useState("");
   const [toast, setToast] = useState(false);
-  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     api.get("/teacher/classrooms").then(d => {
@@ -35,29 +34,14 @@ export default function NewAssignmentTab({ onCreated }) {
     });
   }, [onCreated]);
 
-  function addQuestion() {
-    const q = newQ.trim();
-    if (!q) return;
-    setQuestions([...questions, q]);
-    setNewQ("");
-  }
-
-  async function importQuestions(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    e.target.value = "";
-    setImporting(true);
-    setError("");
-    try {
-      const { questions: qs } = await api.upload("/teacher/parse-questions", file);
-      setQuestions([...questions, ...qs]);
-    } catch (err) { setError(err.message); } finally { setImporting(false); }
-  }
-
   async function createAssignment() {
     setError("");
     if (!title.trim() || !passage.trim()) { setError("Please add a title and passage."); return; }
     if (!classId) { setError("Please create a classroom first."); return; }
+    if (questions.some(q => !q.text.trim() || q.options.some(o => !o.trim()))) {
+      setError("Every question needs its text and all 4 answer choices filled in.");
+      return;
+    }
     try {
       await api.post("/teacher/assignments", {
         title, instructions, passage, classId, genre, attempts,
@@ -92,28 +76,14 @@ export default function NewAssignmentTab({ onCreated }) {
               <div style={fieldLabel}>READING PASSAGE (upload or paste)</div>
               <div style={{ fontSize: 11.5, color: ACCENT, fontWeight: 600 }}>{wordCount(passage)} words</div>
             </div>
-            <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical", lineHeight: 1.6 }} value={passage} onChange={e => setPassage(e.target.value)} placeholder="Paste the passage text here — word count updates automatically" />
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <div style={dropZone}>📄 paste text above — file/image upload not yet supported</div>
-              <div style={dropZone}>🎬 optional video attachment (coming soon)</div>
+            <textarea style={{ ...inputStyle, minHeight: 120, resize: "vertical", lineHeight: 1.6 }} value={passage} onChange={e => setPassage(e.target.value)} placeholder="Paste the passage text here, or upload a file below — word count updates automatically" />
+            <div style={{ marginTop: 8 }}>
+              <PassageUpload onExtracted={text => setPassage(p => (p.trim() ? p.trim() + "\n\n" + text : text))} />
             </div>
           </div>
           <div>
             <div style={fieldLabel}>COMPREHENSION QUESTIONS ({questions.length})</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input style={{ ...inputStyle, flex: 1 }} value={newQ} onChange={e => setNewQ(e.target.value)} placeholder="Type a question, then Add" onKeyDown={e => e.key === "Enter" && addQuestion()} />
-              <button onClick={addQuestion} style={{ border: "none", cursor: "pointer", padding: "9px 16px", borderRadius: 8, background: "var(--chip-bg)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 600 }}>Add</button>
-            </div>
-            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 12, color: "var(--text-muted)", fontWeight: 600, cursor: "pointer", background: "#FCFBF8" }}>
-              📎 {importing ? "Reading file…" : "Upload questions from DOCX / PDF"}
-              <input type="file" accept=".docx,.pdf" onChange={importQuestions} style={{ display: "none" }} />
-            </label>
-            <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 4 }}>One question per line, ending with "?" — they'll be added to the list below.</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
-              {questions.map((q, i) => (
-                <div key={i} style={{ fontSize: 12.5, padding: "7px 10px", background: "var(--subtle-bg)", borderRadius: 7, color: "var(--text-muted)" }}>{i + 1}. {q}</div>
-              ))}
-            </div>
+            <QuestionEditor questions={questions} setQuestions={setQuestions} />
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

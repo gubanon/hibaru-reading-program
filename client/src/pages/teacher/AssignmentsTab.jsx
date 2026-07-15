@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../../api";
-import { FAINT, NAVY, GREEN , ACCENT } from "../../theme";
+import { FAINT, NAVY, GREEN, ACCENT } from "../../theme";
 import { Toast } from "../../components/ui";
+import QuestionEditor from "../../components/QuestionEditor";
+import PassageUpload from "../../components/PassageUpload";
 
 const fieldLabel = { fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 5 };
 const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inherit", fontSize: 14, padding: "10px 12px", border: "1px solid var(--input-border)", borderRadius: 8, outline: "none" };
@@ -48,42 +50,28 @@ function ListView({ groups, onEdit, onView, onPrint, onDocx, saveToast }) {
 function EditView({ id, onBack, onSaved }) {
   const [a, setA] = useState(null);
   const [error, setError] = useState("");
-  const [newQ, setNewQ] = useState("");
 
   useEffect(() => { api.get(`/teacher/assignments/${id}`).then(d => setA(d.assignment)); }, [id]);
 
   if (!a) return null;
 
   function set(field, value) { setA({ ...a, [field]: value }); }
-  function addQ() {
-    const q = newQ.trim();
-    if (!q) return;
-    set("questions", [...a.questions.map(q2 => q2.text), q]);
-    setNewQ("");
-  }
-  async function importQuestions(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    e.target.value = "";
-    try {
-      const { questions: qs } = await api.upload("/teacher/parse-questions", file);
-      set("questions", [...a.questions.map(q2 => q2.text), ...qs]);
-    } catch (err) { setError(err.message); }
-  }
   async function save() {
     setError("");
     if (!a.title.trim() || !a.passage.trim()) { setError("Title and passage are required."); return; }
+    if (a.questions.some(q => !q.text.trim() || q.options.some(o => !o.trim()))) {
+      setError("Every question needs its text and all 4 answer choices filled in.");
+      return;
+    }
     try {
       await api.put(`/teacher/assignments/${id}`, {
         title: a.title, instructions: a.instructions, passage: a.passage, genre: a.genre,
         attempts: a.attempts, timeLimit: a.timeLimit, sensitivity: a.sensitivity,
-        deadlineISO: a.deadlineISO, questions: (a.questions || []).map(q => q.text || q)
+        deadlineISO: a.deadlineISO, questions: a.questions
       });
       onSaved();
     } catch (e) { setError(e.message); }
   }
-
-  const questionTexts = a.questions.map(q => q.text || q);
 
   return (
     <>
@@ -104,25 +92,13 @@ function EditView({ id, onBack, onSaved }) {
               <div style={{ fontSize: 11.5, color: ACCENT, fontWeight: 600 }}>{wordCount(a.passage)} words</div>
             </div>
             <textarea style={{ ...inputStyle, minHeight: 140, resize: "vertical", lineHeight: 1.6 }} value={a.passage} onChange={e => set("passage", e.target.value)} />
+            <div style={{ marginTop: 8 }}>
+              <PassageUpload onExtracted={text => set("passage", a.passage.trim() ? a.passage.trim() + "\n\n" + text : text)} />
+            </div>
           </div>
           <div>
             <div style={fieldLabel}>COMPREHENSION QUESTIONS</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-              {questionTexts.map((q, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "7px 10px", background: "var(--subtle-bg)", borderRadius: 7, color: "var(--text-muted)" }}>
-                  <span style={{ flex: 1 }}>{i + 1}. {q}</span>
-                  <button onClick={() => set("questions", questionTexts.filter((_, j) => j !== i))} style={{ border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 13, color: "#B3261E", fontWeight: 700 }}>✕</button>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <input style={{ ...inputStyle, flex: 1 }} value={newQ} onChange={e => setNewQ(e.target.value)} placeholder="Add a question" onKeyDown={e => e.key === "Enter" && addQ()} />
-              <button onClick={addQ} style={{ border: "none", cursor: "pointer", padding: "9px 16px", borderRadius: 8, background: "var(--chip-bg)", color: "var(--text)", fontFamily: "inherit", fontSize: 13, fontWeight: 600 }}>Add</button>
-            </div>
-            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8, border: "1.5px dashed #DDDACE", borderRadius: 8, padding: 10, fontSize: 12, color: "var(--text-muted)", fontWeight: 600, cursor: "pointer", background: "#FCFBF8" }}>
-              📎 Upload questions from DOCX / PDF
-              <input type="file" accept=".docx,.pdf" onChange={importQuestions} style={{ display: "none" }} />
-            </label>
+            <QuestionEditor questions={a.questions} setQuestions={qs => set("questions", qs)} />
           </div>
         </div>
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 13 }}>

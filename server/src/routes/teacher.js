@@ -59,6 +59,28 @@ function loadAssignment(id) {
   };
 }
 
+// `questions` from the client is [{ text, options: [4 strings], correct: 0-3 }].
+// Reject anything malformed rather than silently falling back to filler
+// answers — a comprehension question with fake choices is worse than none.
+function validateQuestions(questions) {
+  if (!Array.isArray(questions)) return "Questions must be a list.";
+  for (const q of questions) {
+    if (!q || typeof q.text !== "string" || !q.text.trim()) return "Every question needs text.";
+    if (!Array.isArray(q.options) || q.options.length !== 4 || q.options.some(o => typeof o !== "string" || !o.trim())) {
+      return `"${q.text.trim()}" needs all 4 answer choices filled in.`;
+    }
+    if (!Number.isInteger(q.correct) || q.correct < 0 || q.correct > 3) return `"${q.text.trim()}" needs a correct answer selected.`;
+  }
+  return null;
+}
+
+function insertQuestions(assignmentId, questions) {
+  (questions || []).forEach((q, i) => {
+    db.prepare("INSERT INTO questions (id, assignment_id, seq, text, options, correct_index) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(nanoid(), assignmentId, i, q.text.trim(), JSON.stringify(q.options.map(o => o.trim())), q.correct);
+  });
+}
+
 function ownsClassroom(teacherId, classroomId) {
   return !!db.prepare("SELECT id FROM classrooms WHERE id = ? AND teacher_id = ?").get(classroomId, teacherId);
 }
@@ -146,6 +168,8 @@ router.post("/assignments", (req, res) => {
   const { title, instructions, passage, classId, genre, attempts, timeLimit, sensitivity, deadline, questions } = req.body || {};
   if (!title?.trim() || !passage?.trim()) return res.status(400).json({ error: "Please add a title and passage." });
   if (!ownsClassroom(req.user.id, classId)) return res.status(400).json({ error: "Invalid target classroom." });
+  const qError = validateQuestions(questions);
+  if (qError) return res.status(400).json({ error: qError });
 
   const id = nanoid();
   const now = Date.now();
@@ -154,10 +178,7 @@ router.post("/assignments", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, classId, req.user.id, title.trim(), instructions || "Read the passage aloud clearly.", passage, genre || "Non-Fiction", attempts || "3", timeLimit || "10 minutes", sensitivity || "Default", deadline || "", now);
 
-  (questions || []).forEach((q, i) => {
-    db.prepare("INSERT INTO questions (id, assignment_id, seq, text, options, correct_index) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(nanoid(), id, i, q, JSON.stringify(["Answer A", "Answer B", "Answer C", "Answer D"]), 0);
-  });
+  insertQuestions(id, questions);
   deriveVocab(passage).forEach((v, i) => {
     db.prepare("INSERT INTO vocab_words (id, assignment_id, seq, word, def, def_fil) VALUES (?, ?, ?, ?, ?, ?)")
       .run(nanoid(), id, i, v.word, v.def, v.defFil);
@@ -216,16 +237,15 @@ router.put("/assignments/:id", (req, res) => {
   if (!ownsAssignment(req.user.id, id)) return res.status(404).json({ error: "Assignment not found." });
   const { title, instructions, passage, genre, attempts, timeLimit, sensitivity, deadlineISO, questions } = req.body || {};
   if (!title?.trim() || !passage?.trim()) return res.status(400).json({ error: "Title and passage are required." });
+  const qError = validateQuestions(questions);
+  if (qError) return res.status(400).json({ error: qError });
   db.prepare(`
     UPDATE assignments SET title=?, instructions=?, passage=?, genre=?, attempts=?, time_limit=?, sensitivity=?, deadline_iso=?, updated_at=?
     WHERE id = ?
   `).run(title.trim(), instructions || "", passage, genre, attempts, timeLimit, sensitivity, deadlineISO || "", Date.now(), id);
 
   db.prepare("DELETE FROM questions WHERE assignment_id = ?").run(id);
-  (questions || []).forEach((q, i) => {
-    db.prepare("INSERT INTO questions (id, assignment_id, seq, text, options, correct_index) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(nanoid(), id, i, q, JSON.stringify(["Answer A", "Answer B", "Answer C", "Answer D"]), 0);
-  });
+  insertQuestions(id, questions);
   db.prepare("DELETE FROM vocab_words WHERE assignment_id = ?").run(id);
   deriveVocab(passage).forEach((v, i) => {
     db.prepare("INSERT INTO vocab_words (id, assignment_id, seq, word, def, def_fil) VALUES (?, ?, ?, ?, ?, ?)")
@@ -250,6 +270,17 @@ function handleUpload(req, res, next) {
     next();
   });
 }
+
+router.post("/extract-text", handleUpload, async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded." });
+  try {
+    const text = await extractTextFromBuffer(req.file.buffer, req.file.originalname);
+    if (!text || !text.trim()) return res.status(422).json({ error: "No readable text found in that file." });
+    res.json({ text });
+  } catch (e) {
+    res.status(422).json({ error: "Could not read that file. Please upload a .docx or .pdf." });
+  }
+});
 
 router.post("/parse-questions", handleUpload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded." });
