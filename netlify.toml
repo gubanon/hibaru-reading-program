@@ -1,7 +1,10 @@
 [build]
   base = "client"
   command = "npm run build"
-  publish = "client/dist"
+  # Relative to `base` on Netlify CI (resolves to client/dist). The CLI
+  # resolves publish from the repo root instead — for a manual deploy, pass
+  # --dir client/dist explicitly rather than relying on this value.
+  publish = "dist"
 
 [[redirects]]
   from = "/*"
