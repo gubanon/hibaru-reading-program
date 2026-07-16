@@ -15,7 +15,18 @@ function getTransporter() {
     }
     return null;
   }
-  transporter = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
+  // Explicit host/port/STARTTLS rather than the `service: "gmail"` shorthand
+  // (which defaults to port 465/implicit TLS) — several cloud hosts,
+  // including Render, silently drop outbound connections on 465 while 587
+  // works fine, surfacing as a hung "Connection timeout" rather than a
+  // clear auth/network error.
+  transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user, pass }
+  });
   return transporter;
 }
 
