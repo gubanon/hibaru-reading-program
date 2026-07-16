@@ -17,7 +17,7 @@ export default function NewAssignmentTab({ onCreated }) {
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [passage, setPassage] = useState("");
-  const [classId, setClassId] = useState("");
+  const [classIds, setClassIds] = useState([]);
   const [genre, setGenre] = useState("Fiction");
   const [attempts, setAttempts] = useState("3");
   const [timeLimit, setTimeLimit] = useState("10");
@@ -30,21 +30,25 @@ export default function NewAssignmentTab({ onCreated }) {
   useEffect(() => {
     api.get("/teacher/classrooms").then(d => {
       setClasses(d.classrooms);
-      if (d.classrooms.length) setClassId(d.classrooms[0].id);
+      if (d.classrooms.length) setClassIds([d.classrooms[0].id]);
     });
   }, [onCreated]);
+
+  function toggleClass(id) {
+    setClassIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
 
   async function createAssignment() {
     setError("");
     if (!title.trim() || !passage.trim()) { setError("Please add a title and passage."); return; }
-    if (!classId) { setError("Please create a classroom first."); return; }
-    if (questions.some(q => !q.text.trim() || q.options.some(o => !o.trim()))) {
-      setError("Every question needs its text and all 4 answer choices filled in.");
+    if (!classIds.length) { setError("Please select at least one classroom."); return; }
+    if (questions.some(q => !q.text.trim() || q.options.some(o => !o.trim()) || !Number.isInteger(q.correct) || q.correct < 0)) {
+      setError("Every question needs its text, all 4 answer choices filled in, and a correct answer selected.");
       return;
     }
     try {
       await api.post("/teacher/assignments", {
-        title, instructions, passage, classId, genre, attempts,
+        title, instructions, passage, classIds, genre, attempts,
         timeLimit: timeLimit === "None" ? "No limit" : `${timeLimit} minutes`,
         sensitivity, deadline, questions
       });
@@ -89,10 +93,24 @@ export default function NewAssignmentTab({ onCreated }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 13 }}>
             <div>
-              <div style={fieldLabel}>TARGET CLASSROOM</div>
-              <select style={{ ...inputStyle, padding: "9px 10px" }} value={classId} onChange={e => setClassId(e.target.value)}>
-                {classes.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 5 }}>
+                <div style={fieldLabel}>TARGET CLASSROOM(S)</div>
+                {classes.length > 1 && (
+                  <button type="button" onClick={() => setClassIds(classIds.length === classes.length ? [] : classes.map(o => o.id))}
+                    style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: ACCENT }}>
+                    {classIds.length === classes.length ? "Deselect all" : "Select all"}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", border: "1px solid var(--input-border)", borderRadius: 8, padding: 8 }}>
+                {classes.map(o => (
+                  <label key={o.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer", padding: "4px 6px", borderRadius: 6, background: classIds.includes(o.id) ? "var(--subtle-bg)" : "transparent" }}>
+                    <input type="checkbox" checked={classIds.includes(o.id)} onChange={() => toggleClass(o.id)} />
+                    {o.name}
+                  </label>
+                ))}
+                {!classes.length && <div style={{ fontSize: 12.5, color: "var(--text-faint)" }}>Create a classroom first.</div>}
+              </div>
             </div>
             <div>
               <div style={fieldLabel}>GENRE</div>

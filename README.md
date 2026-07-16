@@ -123,8 +123,9 @@ set real values for `JWT_SECRET`, `CORS_ORIGIN`, `ADMIN_PASSWORD`, and
 `MASTER_ADMIN_PASSWORD` (if these are left unset, the server generates a
 random one-time password and logs it once — it does not fall back to a
 fixed default). Also put the server behind HTTPS and set
-`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` so data survives redeploys — see
-DEPLOY.md.
+`TURSO_DATABASE_URL`/`TURSO_AUTH_TOKEN` so data survives redeploys, and
+`EMAIL_USER`/`EMAIL_APP_PASSWORD` so classroom-invite and new-assignment
+emails actually send — see DEPLOY.md.
 
 ## Terms & Conditions / Privacy Policy
 

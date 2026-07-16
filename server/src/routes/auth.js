@@ -1,9 +1,10 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const { nanoid } = require("nanoid");
 const db = require("../db");
-const { signToken, requireAuth } = require("../auth");
+const { signToken, requireAuth, JWT_SECRET } = require("../auth");
 const loginAttempts = require("../loginAttempts");
 
 const router = express.Router();
@@ -119,6 +120,61 @@ router.post("/student-claim", authLimiter, async (req, res) => {
   await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), user.id);
   const updated = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
   res.json({ token: signToken(updated), user: publicUser(updated) });
+});
+
+// Classroom invite links (see POST /teacher/classrooms/:id/invites) — public
+// lookup + accept. A brand-new student sets their password here (same as
+// student-claim); an existing student must already be logged in as that
+// exact account, so a forwarded/leaked link can't be used to hijack it.
+router.get("/invite/:token", async (req, res) => {
+  const inv = await db.prepare(`
+    SELECT ci.status, ci.email, c.name as classroom_name, u.password_hash
+    FROM classroom_invites ci
+    JOIN classrooms c ON c.id = ci.classroom_id
+    JOIN users u ON u.id = ci.student_id
+    WHERE ci.token = ?
+  `).get(req.params.token);
+  if (!inv) return res.status(404).json({ error: "This invite link is invalid." });
+  if (inv.status === "revoked") return res.status(410).json({ error: "This invite has been revoked by the teacher." });
+  res.json({
+    classroomName: inv.classroom_name,
+    email: inv.email,
+    alreadyJoined: inv.status === "joined",
+    needsPassword: inv.password_hash === "UNCLAIMED"
+  });
+});
+
+router.post("/invite/:token/accept", authLimiter, async (req, res) => {
+  const inv = await db.prepare("SELECT * FROM classroom_invites WHERE token = ?").get(req.params.token);
+  if (!inv) return res.status(404).json({ error: "This invite link is invalid." });
+  if (inv.status === "revoked") return res.status(410).json({ error: "This invite has been revoked by the teacher." });
+
+  const student = await db.prepare("SELECT * FROM users WHERE id = ?").get(inv.student_id);
+  if (!student) return res.status(404).json({ error: "Account not found." });
+
+  let authedUser = student;
+  if (student.password_hash === "UNCLAIMED") {
+    const { password, agreeToTerms } = req.body || {};
+    if (!password || password.length < 6) return res.status(400).json({ error: "Please choose a password of at least 6 characters." });
+    if (!agreeToTerms) return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to continue." });
+    await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), student.id);
+    authedUser = await db.prepare("SELECT * FROM users WHERE id = ?").get(student.id);
+  } else {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    let payload;
+    try { payload = token && jwt.verify(token, JWT_SECRET); } catch { payload = null; }
+    if (!payload || payload.id !== student.id) {
+      return res.status(401).json({ error: "Please log in as this student to accept the invite.", code: "LOGIN_REQUIRED" });
+    }
+  }
+
+  if (inv.status !== "joined") {
+    await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(inv.classroom_id, inv.student_id);
+    await db.prepare("UPDATE classroom_invites SET status='joined', joined_at=? WHERE id=?").run(Date.now(), inv.id);
+  }
+
+  res.json({ token: signToken(authedUser), user: publicUser(authedUser) });
 });
 
 router.post("/forgot", authLimiter, (req, res) => {

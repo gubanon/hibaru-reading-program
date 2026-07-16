@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { ThemeProvider } from "./theme/ThemeContext";
 import Login from "./pages/Login";
+import Join from "./pages/Join";
 import AdminConsole from "./pages/admin/AdminConsole";
 import TeacherConsole from "./pages/teacher/TeacherConsole";
 import StudentConsole from "./pages/student/StudentConsole";
@@ -32,6 +33,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginRoute />} />
+            <Route path="/join/:token" element={<Join />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/admin" element={<Protected role="admin"><AdminConsole /></Protected>} />

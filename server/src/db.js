@@ -132,6 +132,18 @@ function init() {
         PRIMARY KEY (classroom_id, student_id)
       );
 
+      CREATE TABLE IF NOT EXISTS classroom_invites (
+        id TEXT PRIMARY KEY,
+        classroom_id TEXT NOT NULL REFERENCES classrooms(id) ON DELETE CASCADE,
+        teacher_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        student_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','joined','revoked')),
+        created_at INTEGER NOT NULL,
+        joined_at INTEGER
+      );
+
       CREATE TABLE IF NOT EXISTS assignments (
         id TEXT PRIMARY KEY,
         classroom_id TEXT NOT NULL REFERENCES classrooms(id) ON DELETE CASCADE,

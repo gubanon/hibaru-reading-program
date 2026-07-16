@@ -25,7 +25,7 @@ function LetterButton({ letter, active, onClick }) {
 }
 
 function QuestionRow({ q, index, onChange, onRemove }) {
-  const incomplete = !q.text.trim() || q.options.some(o => !o.trim());
+  const incomplete = !q.text.trim() || q.options.some(o => !o.trim()) || !Number.isInteger(q.correct) || q.correct < 0;
   function setText(text) { onChange(index, { ...q, text }); }
   function setOption(oi, value) { const next = [...q.options]; next[oi] = value; onChange(index, { ...q, options: next }); }
   function setCorrect(oi) { onChange(index, { ...q, correct: oi }); }
@@ -48,15 +48,27 @@ function QuestionRow({ q, index, onChange, onRemove }) {
           </div>
         ))}
       </div>
-      {incomplete && <div style={{ fontSize: 10.5, color: "oklch(0.55 0.15 60)", marginTop: 6, marginLeft: 22 }}>Fill in the question and all 4 choices.</div>}
+      {incomplete && (
+        <div style={{ fontSize: 10.5, color: "oklch(0.55 0.15 60)", marginTop: 6, marginLeft: 22 }}>
+          {!q.text.trim() || q.options.some(o => !o.trim()) ? "Fill in the question and all 4 choices." : "Click a letter to choose the correct answer."}
+        </div>
+      )}
     </div>
   );
 }
+
+const FORMAT_EXAMPLE = `1. What is the capital of the Philippines?
+A. Cebu
+B. Davao
+C. Manila
+D. Baguio
+Answer: C`;
 
 // `questions` / `setQuestions` hold [{ text, options: [4 strings], correct: 0-3 }].
 export default function QuestionEditor({ questions, setQuestions, importPath = "/teacher/parse-questions" }) {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [showFormat, setShowFormat] = useState(false);
 
   function addBlank() { setQuestions([...questions, blankQuestion()]); }
   function updateAt(i, q) { setQuestions(questions.map((old, j) => (j === i ? q : old))); }
@@ -69,9 +81,11 @@ export default function QuestionEditor({ questions, setQuestions, importPath = "
     setImporting(true);
     setImportError("");
     try {
-      const { questions: texts } = await api.upload(importPath, file);
-      // Imported questions bring text only — choices still need to be typed in.
-      setQuestions([...questions, ...texts.map(text => ({ text, options: ["", "", "", ""], correct: 0 }))]);
+      // Server already returns { text, options: [4 strings, blank if not
+      // found], correct: 0-3 or -1 } — a fully-formatted file needs zero
+      // manual entry; anything less just leaves gaps for the teacher to fill.
+      const { questions: parsed } = await api.upload(importPath, file);
+      setQuestions([...questions, ...parsed.map(q => ({ text: q.text, options: q.options, correct: q.correct }))]);
     } catch (err) { setImportError(err.message); } finally { setImporting(false); }
   }
 
@@ -88,7 +102,15 @@ export default function QuestionEditor({ questions, setQuestions, importPath = "
         </label>
       </div>
       {importError && <div style={{ fontSize: 11.5, color: "#B3261E", marginTop: 6 }}>{importError}</div>}
-      <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>Click a letter to mark that choice correct. Imported questions bring the question text only — their choices still need to be filled in.</div>
+      <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>
+        Click a letter to mark the correct choice. Format your file like the example below and questions import fully filled in — choices and answer included.{" "}
+        <button type="button" onClick={() => setShowFormat(s => !s)} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 10.5, fontWeight: 700, color: ACCENT }}>
+          {showFormat ? "Hide example" : "Show example"}
+        </button>
+      </div>
+      {showFormat && (
+        <pre style={{ marginTop: 6, padding: 10, background: "var(--subtle-bg)", borderRadius: 8, fontSize: 11, lineHeight: 1.6, whiteSpace: "pre-wrap", color: "var(--text-muted)", fontFamily: "inherit" }}>{FORMAT_EXAMPLE}</pre>
+      )}
     </div>
   );
 }

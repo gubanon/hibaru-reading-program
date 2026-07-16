@@ -41,13 +41,25 @@ export function AuthProvider({ children }) {
     return user;
   };
 
+  // Accepting a classroom-invite link either sets a brand-new password
+  // (unclaimed account) or, for an already-claimed account, just needs the
+  // caller to already be logged in as that student — the server checks the
+  // bearer token matches, api.js attaches it automatically.
+  const acceptInvite = async (inviteToken, body) => {
+    const { token, user } = await api.post(`/auth/invite/${inviteToken}/accept`, body || {});
+    setToken(token);
+    setUser(user);
+    setViewAs("student");
+    return user;
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, claimStudent, logout, viewAs, setViewAs }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, claimStudent, acceptInvite, logout, viewAs, setViewAs }}>
       {children}
     </AuthContext.Provider>
   );

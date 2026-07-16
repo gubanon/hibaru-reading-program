@@ -41,6 +41,14 @@ export default function Login() {
     setError(""); setBusy(true);
     try {
       const user = await login(email, pass, role);
+      // If they arrived here via a "log in to accept this invite" bounce
+      // from the Join page, send them straight back to finish accepting it.
+      const pendingInvite = sessionStorage.getItem("hibaru_pending_invite");
+      if (pendingInvite && user.role === "student") {
+        sessionStorage.removeItem("hibaru_pending_invite");
+        navigate(`/join/${pendingInvite}`);
+        return;
+      }
       navigate(user.role === "admin" ? "/admin" : user.role === "student" ? "/student" : "/teacher");
     } catch (e) {
       if (e.code === "UNCLAIMED") { setMode("claim"); setError(""); }

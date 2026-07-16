@@ -32,3 +32,12 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
+      # Gmail SMTP (Nodemailer) — powers classroom-invite emails and
+      # new-assignment notifications. Without these, the app still works,
+      # those emails are just skipped. See DEPLOY.md.
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_APP_PASSWORD
+        sync: false
+      - key: CLIENT_URL
+        value: https://hibaru-reading-program.netlify.app

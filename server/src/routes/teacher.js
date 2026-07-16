@@ -1,11 +1,17 @@
 const express = require("express");
 const multer = require("multer");
+const crypto = require("crypto");
 const { nanoid } = require("nanoid");
 const db = require("../db");
 const { requireAuth, requireRole } = require("../auth");
 const { wordCount, metricsFor } = require("../scoring");
 const { buildAssignmentDoc, buildConsolidatedDoc } = require("../docx");
 const { extractTextFromBuffer, parseQuestionsFromText } = require("../extract");
+const { sendEmail, escapeHtml, CLIENT_URL } = require("../email");
+
+function inviteToken() {
+  return crypto.randomBytes(24).toString("base64url");
+}
 
 const router = express.Router();
 router.use(requireAuth, requireRole("teacher"));
@@ -109,12 +115,14 @@ router.get("/classrooms", async (req, res) => {
       SELECT u.* FROM classroom_students cs JOIN users u ON u.id = cs.student_id
       WHERE cs.classroom_id = ? ORDER BY u.surname
     `).all(c.id);
+    const invites = await db.prepare("SELECT * FROM classroom_invites WHERE classroom_id = ? AND status = 'pending' ORDER BY created_at DESC").all(c.id);
     const assignmentCount = (await db.prepare("SELECT COUNT(*) n FROM assignments WHERE classroom_id = ?").get(c.id)).n;
     out.push({
       id: c.id, name: c.name, assignmentCount,
       students: students.map(s => ({
         id: s.id, surname: s.surname, given: s.given_name, mi: s.mi, sex: s.sex, grade: s.grade_section, email: s.email
-      }))
+      })),
+      invites: invites.map(i => ({ id: i.id, email: i.email, createdAt: i.created_at }))
     });
   }
   res.json({ classrooms: out });
@@ -128,24 +136,100 @@ router.post("/classrooms", async (req, res) => {
   res.json({ id, name });
 });
 
-router.post("/classrooms/:id/students", async (req, res) => {
+router.put("/classrooms/:id", async (req, res) => {
   const classId = req.params.id;
   if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
-  const { surname, given, mi, sex, grade, email } = req.body || {};
-  if (!surname?.trim() || !given?.trim()) return res.status(400).json({ error: "Please enter at least Surname and Given Name." });
+  const name = (req.body?.name || "").trim();
+  if (!name) return res.status(400).json({ error: "Classroom name is required." });
+  await db.prepare("UPDATE classrooms SET name = ? WHERE id = ?").run(name, classId);
+  res.json({ ok: true, name });
+});
+
+router.delete("/classrooms/:id", async (req, res) => {
+  const classId = req.params.id;
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  // ON DELETE CASCADE cleans up classroom_students, classroom_invites, and
+  // assignments (which in turn cascades their own questions/vocab/submissions).
+  await db.prepare("DELETE FROM classrooms WHERE id = ?").run(classId);
+  res.json({ ok: true });
+});
+
+router.delete("/classrooms/:id/students/:studentId", async (req, res) => {
+  const classId = req.params.id;
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  await db.prepare("DELETE FROM classroom_students WHERE classroom_id = ? AND student_id = ?").run(classId, req.params.studentId);
+  res.json({ ok: true });
+});
+
+async function sendInviteEmail(invite, classroomName) {
+  const link = `${CLIENT_URL}/join/${invite.token}`;
+  return sendEmail({
+    to: invite.email,
+    subject: `You're invited to join ${classroomName} on Project HIBARU`,
+    html: `
+      <p>Your teacher has invited you to join <strong>${escapeHtml(classroomName)}</strong> on Project HIBARU, Taft National High School's remedial reading program.</p>
+      <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#22335E;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Join classroom</a></p>
+      <p>Or copy this link into your browser:<br>${link}</p>
+      <p style="color:#888;font-size:12px;">If you weren't expecting this invite, you can safely ignore this email.</p>
+    `
+  });
+}
+
+// Teachers invite by email only — the student clicks the emailed "Join"
+// link and is responsible for their own profile from then on (see
+// GET/POST /auth/invite/:token in auth.js for the accept flow). The
+// classroom roster only gains the student once they actually click through,
+// not at invite time.
+router.post("/classrooms/:id/invites", async (req, res) => {
+  const classId = req.params.id;
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  const emailNorm = (req.body?.email || "").trim().toLowerCase();
+  if (!emailNorm || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) return res.status(400).json({ error: "Please enter a valid email address." });
 
   const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(classId);
-  const emailNorm = (email || "").trim().toLowerCase() || `${given}.${surname}.${nanoid(5)}@pending.local`.toLowerCase().replace(/\s+/g, "");
+
   let student = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
+  if (student && student.role !== "student") return res.status(409).json({ error: "That email already belongs to a non-student account." });
   if (!student) {
     const id = nanoid();
     await db.prepare(`
-      INSERT INTO users (id, role, email, password_hash, status, surname, given_name, mi, sex, grade_section, created_at)
-      VALUES (?, 'student', ?, 'UNCLAIMED', 'active', ?, ?, ?, ?, ?, ?)
-    `).run(id, emailNorm, surname.trim(), given.trim(), (mi || "").trim(), sex || "M", grade?.trim() || cls.name, Date.now());
+      INSERT INTO users (id, role, email, password_hash, status, created_at)
+      VALUES (?, 'student', ?, 'UNCLAIMED', 'active', ?)
+    `).run(id, emailNorm, Date.now());
     student = await db.prepare("SELECT * FROM users WHERE id = ?").get(id);
   }
-  await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(classId, student.id);
+
+  const already = await db.prepare("SELECT 1 FROM classroom_students WHERE classroom_id = ? AND student_id = ?").get(classId, student.id);
+  if (already) return res.status(409).json({ error: "This student is already in the classroom." });
+
+  let invite = await db.prepare("SELECT * FROM classroom_invites WHERE classroom_id = ? AND email = ? AND status = 'pending'").get(classId, emailNorm);
+  if (!invite) {
+    const id = nanoid();
+    await db.prepare(`
+      INSERT INTO classroom_invites (id, classroom_id, teacher_id, student_id, email, token, status, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).run(id, classId, req.user.id, student.id, emailNorm, inviteToken(), Date.now());
+    invite = await db.prepare("SELECT * FROM classroom_invites WHERE id = ?").get(id);
+  }
+
+  const { sent } = await sendInviteEmail(invite, cls.name);
+  res.json({ ok: true, emailSent: sent });
+});
+
+router.post("/classrooms/:id/invites/:inviteId/resend", async (req, res) => {
+  const classId = req.params.id;
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  const invite = await db.prepare("SELECT * FROM classroom_invites WHERE id = ? AND classroom_id = ? AND status = 'pending'").get(req.params.inviteId, classId);
+  if (!invite) return res.status(404).json({ error: "Invite not found." });
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(classId);
+  const { sent } = await sendInviteEmail(invite, cls.name);
+  res.json({ ok: true, emailSent: sent });
+});
+
+router.delete("/classrooms/:id/invites/:inviteId", async (req, res) => {
+  const classId = req.params.id;
+  if (!(await ownsClassroom(req.user.id, classId))) return res.status(404).json({ error: "Classroom not found." });
+  await db.prepare("DELETE FROM classroom_invites WHERE id = ? AND classroom_id = ?").run(req.params.inviteId, classId);
   res.json({ ok: true });
 });
 
@@ -179,30 +263,64 @@ router.get("/classrooms/:id/docx", async (req, res) => {
 });
 
 // ===== Assignments =====
+
+async function notifyClassroomOfAssignment(classId, title, deadlineISO) {
+  const cls = await db.prepare("SELECT name FROM classrooms WHERE id = ?").get(classId);
+  const students = await db.prepare(`
+    SELECT u.email FROM classroom_students cs JOIN users u ON u.id = cs.student_id
+    WHERE cs.classroom_id = ? AND u.email NOT LIKE '%@pending.local'
+  `).all(classId);
+  const recipients = students.map(s => s.email).filter(Boolean);
+  if (!recipients.length) return;
+  await sendEmail({
+    bcc: recipients,
+    subject: `New reading assignment: ${title}`,
+    html: `
+      <p>A new reading assignment, <strong>${escapeHtml(title)}</strong>, has been posted to <strong>${escapeHtml(cls.name)}</strong> on Project HIBARU.</p>
+      ${deadlineISO ? `<p>Due: ${escapeHtml(deadlineISO)}</p>` : ""}
+      <p><a href="${CLIENT_URL}">Open Project HIBARU</a> to get started.</p>
+    `
+  });
+}
+
+// A single assignment can target several classrooms at once — under the
+// hood this creates one independent assignment row per classroom (same
+// content, separate ids) rather than a many-to-many join, so every other
+// route (progress, analytics, docx export, student /tasks) keeps working
+// against a single classroom_id per assignment with no changes.
 router.post("/assignments", async (req, res) => {
-  const { title, instructions, passage, classId, genre, attempts, timeLimit, sensitivity, deadline, questions } = req.body || {};
+  const { title, instructions, passage, classIds, genre, attempts, timeLimit, sensitivity, deadline, questions } = req.body || {};
   if (!title?.trim() || !passage?.trim()) return res.status(400).json({ error: "Please add a title and passage." });
-  if (!(await ownsClassroom(req.user.id, classId))) return res.status(400).json({ error: "Invalid target classroom." });
+  if (!Array.isArray(classIds) || !classIds.length) return res.status(400).json({ error: "Please select at least one classroom." });
+  for (const cid of classIds) {
+    if (!(await ownsClassroom(req.user.id, cid))) return res.status(400).json({ error: "Invalid target classroom." });
+  }
   const qError = validateQuestions(questions);
   if (qError) return res.status(400).json({ error: qError });
 
-  const id = nanoid();
   const now = Date.now();
-  await db.prepare(`
-    INSERT INTO assignments (id, classroom_id, teacher_id, title, instructions, passage, genre, attempts, time_limit, sensitivity, deadline_iso, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, classId, req.user.id, title.trim(), instructions || "Read the passage aloud clearly.", passage, genre || "Non-Fiction", attempts || "3", timeLimit || "10 minutes", sensitivity || "Default", deadline || "", now);
+  const ids = [];
+  for (const classId of classIds) {
+    const id = nanoid();
+    await db.prepare(`
+      INSERT INTO assignments (id, classroom_id, teacher_id, title, instructions, passage, genre, attempts, time_limit, sensitivity, deadline_iso, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, classId, req.user.id, title.trim(), instructions || "Read the passage aloud clearly.", passage, genre || "Non-Fiction", attempts || "3", timeLimit || "10 minutes", sensitivity || "Default", deadline || "", now);
 
-  await insertQuestions(id, questions);
-  await insertVocab(id, passage);
+    await insertQuestions(id, questions);
+    await insertVocab(id, passage);
 
-  // seed a not-started submission row for every student currently in the class
-  const students = await db.prepare("SELECT student_id FROM classroom_students WHERE classroom_id = ?").all(classId);
-  for (const s of students) {
-    await db.prepare("INSERT OR IGNORE INTO submissions (id, assignment_id, student_id, status) VALUES (?, ?, ?, 'not-started')").run(nanoid(), id, s.student_id);
+    // seed a not-started submission row for every student currently in the class
+    const students = await db.prepare("SELECT student_id FROM classroom_students WHERE classroom_id = ?").all(classId);
+    for (const s of students) {
+      await db.prepare("INSERT OR IGNORE INTO submissions (id, assignment_id, student_id, status) VALUES (?, ?, ?, 'not-started')").run(nanoid(), id, s.student_id);
+    }
+
+    ids.push(id);
+    notifyClassroomOfAssignment(classId, title.trim(), deadline || "").catch(err => console.error("[hibaru] assignment notification email failed:", err.message));
   }
 
-  res.json({ id });
+  res.json({ ids });
 });
 
 router.get("/assignments", async (req, res) => {
@@ -295,6 +413,7 @@ router.post("/parse-questions", handleUpload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded." });
   try {
     const text = await extractTextFromBuffer(req.file.buffer, req.file.originalname);
+    // Each item is { text, options: [4 strings, blank if not found], correct: 0-3 or -1 }.
     const questions = parseQuestionsFromText(text);
     if (!questions.length) return res.status(422).json({ error: "No questions found in the file. Each question should be on its own line and end with a question mark (?)." });
     res.json({ questions });
