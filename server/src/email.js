@@ -20,11 +20,15 @@ function getTransporter() {
   // including Render, silently drop outbound connections on 465 while 587
   // works fine, surfacing as a hung "Connection timeout" rather than a
   // clear auth/network error.
+  // `family: 4` forces IPv4 for the connection — Render's containers can
+  // resolve smtp.gmail.com's IPv6 (AAAA) address but have no outbound IPv6
+  // route, which fails as ENETUNREACH rather than falling back to IPv4.
   transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
     secure: false,
     requireTLS: true,
+    family: 4,
     auth: { user, pass }
   });
   return transporter;
