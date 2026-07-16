@@ -32,12 +32,15 @@ services:
         sync: false
       - key: TURSO_AUTH_TOKEN
         sync: false
-      # Gmail SMTP (Nodemailer) — powers classroom-invite emails and
-      # new-assignment notifications. Without these, the app still works,
-      # those emails are just skipped. See DEPLOY.md.
-      - key: EMAIL_USER
+      # Email via Brevo's HTTP API — powers classroom-invite emails and
+      # new-assignment notifications. Render's free tier blocks all
+      # outbound SMTP ports, so an HTTP email API is the only option here.
+      # Without these, the app still works, those emails are just skipped.
+      # EMAIL_FROM must be a sender address verified in the Brevo
+      # dashboard. See DEPLOY.md.
+      - key: BREVO_API_KEY
         sync: false
-      - key: EMAIL_APP_PASSWORD
+      - key: EMAIL_FROM
         sync: false
       - key: CLIENT_URL
         value: https://hibaru-reading-program.netlify.app

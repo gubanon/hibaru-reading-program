@@ -4,6 +4,39 @@ const dns = require("dns").promises;
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 const SMTP_HOST = "smtp.gmail.com";
 
+function senderAddress() {
+  return process.env.EMAIL_FROM || process.env.EMAIL_USER;
+}
+
+// --- Brevo (HTTP API) ---
+// Render's free tier blocks ALL outbound SMTP ports (25/465/587) to prevent
+// spam abuse — connections just time out, no config can fix that. Brevo's
+// HTTP API rides over 443 instead, which is never blocked. When
+// BREVO_API_KEY is set it takes precedence over the SMTP path below.
+async function sendViaBrevo({ to, bcc, subject, html }) {
+  const from = senderAddress();
+  const payload = {
+    sender: { name: "Project HIBARU", email: from },
+    subject,
+    htmlContent: html
+  };
+  if (to) payload.to = [{ email: to }];
+  if (bcc && bcc.length) {
+    // Brevo requires a `to` field even for bcc-only sends.
+    if (!payload.to) payload.to = [{ email: from }];
+    payload.bcc = bcc.map(email => ({ email }));
+  }
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: { "api-key": process.env.BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Brevo API ${res.status}: ${body.slice(0, 300)}`);
+  }
+}
+
 let transporterPromise = null;
 let warned = false;
 function getTransporter() {
@@ -12,7 +45,7 @@ function getTransporter() {
   const pass = process.env.EMAIL_APP_PASSWORD;
   if (!user || !pass) {
     if (!warned) {
-      console.warn("[hibaru] EMAIL_USER/EMAIL_APP_PASSWORD not set — invite/notification emails will be skipped (logged only). See .env.example.");
+      console.warn("[hibaru] No email provider configured (BREVO_API_KEY or EMAIL_USER/EMAIL_APP_PASSWORD) — invite/notification emails will be skipped (logged only). See .env.example.");
       warned = true;
     }
     return null;
@@ -57,14 +90,17 @@ function escapeHtml(s) {
 // triggered it (invite creation, assignment posting, etc). Callers that care
 // whether it actually sent can check the returned `sent` flag.
 async function sendEmail({ to, bcc, subject, html }) {
-  const t = await getTransporter();
-  if (!t) {
-    console.warn(`[hibaru] (email skipped) "${subject}" -> ${to || (bcc || []).join(", ")}`);
-    return { sent: false };
-  }
-  const from = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   try {
-    await t.sendMail({ from: `Project HIBARU <${from}>`, to, bcc, subject, html });
+    if (process.env.BREVO_API_KEY) {
+      await sendViaBrevo({ to, bcc, subject, html });
+      return { sent: true };
+    }
+    const t = await getTransporter();
+    if (!t) {
+      console.warn(`[hibaru] (email skipped) "${subject}" -> ${to || (bcc || []).join(", ")}`);
+      return { sent: false };
+    }
+    await t.sendMail({ from: `Project HIBARU <${senderAddress()}>`, to, bcc, subject, html });
     return { sent: true };
   } catch (err) {
     console.error("[hibaru] Failed to send email:", err.message);
