@@ -122,7 +122,10 @@ router.get("/classrooms", async (req, res) => {
       students: students.map(s => ({
         id: s.id, surname: s.surname, given: s.given_name, mi: s.mi, sex: s.sex, grade: s.grade_section, email: s.email
       })),
-      invites: invites.map(i => ({ id: i.id, email: i.email, createdAt: i.created_at }))
+      // joinUrl lets the teacher hand the link out directly (Messenger/SMS)
+      // when the invite email is slow or lands in spam — same token the
+      // email carries, and only ever shown to the classroom's own teacher.
+      invites: invites.map(i => ({ id: i.id, email: i.email, createdAt: i.created_at, joinUrl: `${CLIENT_URL}/join/${i.token}` }))
     });
   }
   res.json({ classrooms: out });

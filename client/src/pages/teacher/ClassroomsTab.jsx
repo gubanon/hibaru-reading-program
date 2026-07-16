@@ -19,12 +19,25 @@ function StudentRow({ s, onRemove }) {
 }
 
 function InviteRow({ inv, onResend, onRevoke }) {
+  const [copied, setCopied] = useState(false);
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(inv.joinUrl);
+    } catch {
+      // Clipboard API can be unavailable (older browsers / non-HTTPS) —
+      // fall back to the classic prompt so the link is still obtainable.
+      window.prompt("Copy this join link:", inv.joinUrl);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "6px 8px", background: "var(--chip-bg)", borderRadius: 8 }}>
       <span style={{ color: "var(--text-faint)" }}>✉</span>
       <span style={{ color: "var(--text-muted)" }}>{inv.email}</span>
       <span style={{ fontSize: 10.5, color: "var(--text-faint-2)" }}>pending</span>
-      <button onClick={() => onResend(inv)} style={{ marginLeft: "auto", border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: ACCENT, padding: "2px 4px" }}>Resend</button>
+      <button onClick={copyLink} style={{ marginLeft: "auto", border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: ACCENT, padding: "2px 4px" }}>{copied ? "Copied ✓" : "Copy link"}</button>
+      <button onClick={() => onResend(inv)} style={{ border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: ACCENT, padding: "2px 4px" }}>Resend</button>
       <button onClick={() => onRevoke(inv)} title="Revoke invite" style={{ border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 13, color: "#B3261E", fontWeight: 700, padding: "0 2px" }}>✕</button>
     </div>
   );
@@ -128,7 +141,7 @@ function ClassCard({ c, idx, onChanged }) {
           <input style={{ ...inputSm, flex: 1 }} value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && invite()} placeholder="student@example.com" />
           <button disabled={busy} onClick={invite} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>Invite</button>
         </div>
-        <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>They'll get an email with a "Join" link — they set up their own profile once they click it.</div>
+        <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>They'll get an email with a "Join" link — they set up their own profile once they click it. You can also use "Copy link" on a pending invite to share it directly (e.g. Messenger).</div>
         {err && <div style={{ color: "#B3261E", fontSize: 11.5, marginTop: 6 }}>{err}</div>}
         {msg && !err && <div style={{ color: GREEN, fontSize: 11.5, marginTop: 6 }}>{msg}</div>}
       </div>
