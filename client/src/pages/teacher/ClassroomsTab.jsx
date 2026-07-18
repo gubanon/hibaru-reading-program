@@ -178,6 +178,7 @@ function ClassCard({ c, idx, onChanged }) {
 export default function ClassroomsTab() {
   const [classrooms, setClassrooms] = useState([]);
   const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => api.get("/teacher/classrooms").then(d => { setClassrooms(d.classrooms); setLoading(false); }), []);
@@ -187,6 +188,7 @@ export default function ClassroomsTab() {
     if (!newName.trim()) return;
     await api.post("/teacher/classrooms", { name: newName.trim() });
     setNewName("");
+    setCreating(false);
     load();
   }
 
@@ -194,18 +196,29 @@ export default function ClassroomsTab() {
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <h2 style={{ margin: 0, fontSize: 21, fontWeight: 700 }}>Classrooms</h2>
         <span style={{ fontSize: 12.5, color: FAINT }}>Mga Silid-Aralan</span>
+        <div style={{ flex: 1 }} />
+        {creating ? (
+          <div style={{ display: "flex", gap: 7 }}>
+            <input autoFocus value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === "Enter" && createClass()}
+              placeholder="e.g. Grade 8 – Bonifacio"
+              style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", border: "1px solid var(--input-border)", borderRadius: 8, outline: "none", background: "var(--card-bg)", color: "var(--text)", width: 230 }} />
+            <button onClick={createClass} style={{ border: "none", cursor: "pointer", padding: "9px 16px", borderRadius: 8, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700 }}>Create</button>
+            <button onClick={() => { setCreating(false); setNewName(""); }} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "9px 14px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>Cancel</button>
+          </div>
+        ) : (
+          <button onClick={() => setCreating(true)} style={{ border: "none", cursor: "pointer", padding: "10px 18px", borderRadius: 9, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 13.5, fontWeight: 700 }}>+ Create Classroom</button>
+        )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(400px,1fr))", gap: 16 }}>
         {classrooms.map((c, i) => <ClassCard key={c.id} c={c} idx={i} onChanged={load} />)}
-        <div style={{ border: "2px dashed #DDDACE", borderRadius: 14, padding: 20, display: "flex", flexDirection: "column", gap: 10, justifyContent: "center" }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text-muted)" }}>Create a classroom</div>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Grade 8 – Bonifacio"
-            style={{ fontFamily: "inherit", fontSize: 13, padding: "10px 12px", border: "1px solid var(--input-border)", borderRadius: 8, outline: "none", background: "var(--card-bg)", color: "var(--text)" }} />
-          <button onClick={createClass} style={{ border: "none", cursor: "pointer", padding: "10px 14px", borderRadius: 8, background: "var(--ink)", color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 600 }}>+ Create</button>
-        </div>
+        {!classrooms.length && (
+          <div style={{ border: "2px dashed #DDDACE", borderRadius: 14, padding: 20, fontSize: 13, color: "var(--text-faint)" }}>
+            No classrooms yet — use "+ Create Classroom" in the top right to make your first one.
+          </div>
+        )}
       </div>
     </>
   );

@@ -32,6 +32,10 @@ export default function ClassJoin() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [surname, setSurname] = useState("");
+  const [given, setGiven] = useState("");
+  const [mi, setMi] = useState("");
+  const [grade, setGrade] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -52,12 +56,14 @@ export default function ClassJoin() {
 
   async function joinAsNew() {
     setFormError("");
+    if (!surname.trim() || !given.trim()) { setFormError("Please enter your Surname and Given Name."); return; }
+    if (!grade.trim()) { setFormError("Please enter your Grade & Section."); return; }
     if (pass.length < 6) { setFormError("Password must be at least 6 characters."); return; }
     if (pass !== confirmPass) { setFormError("Passwords don't match."); return; }
     if (!agreeTerms) { setFormError("Please accept the Terms & Conditions and Privacy Policy to continue."); return; }
     setBusy(true);
     try {
-      await joinClass(token, { email, password: pass, agreeToTerms: agreeTerms });
+      await joinClass(token, { email, password: pass, surname, given, mi, grade, agreeToTerms: agreeTerms });
       navigate("/student");
     } catch (e) {
       if (e.code === "LOGIN_REQUIRED") {
@@ -95,6 +101,12 @@ export default function ClassJoin() {
       <h2 style={{ margin: "0 0 6px", fontSize: 20, fontWeight: 700 }}>Join {state.className}</h2>
       <div style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 20 }}>Create your student account to join. Already have one? <button onClick={() => { sessionStorage.setItem(PENDING_CLASS_KEY, token); navigate("/"); }} style={{ border: "none", background: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontSize: 13.5, fontWeight: 700, color: "var(--accent)" }}>Log in first</button> and open this link again.</div>
       <Field label="EMAIL"><TextInput value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.2fr .5fr", gap: 8 }}>
+        <Field label="SURNAME"><TextInput value={surname} onChange={e => setSurname(e.target.value)} placeholder="Dela Cruz" /></Field>
+        <Field label="GIVEN NAME"><TextInput value={given} onChange={e => setGiven(e.target.value)} placeholder="Juan" /></Field>
+        <Field label="M.I."><TextInput value={mi} onChange={e => setMi(e.target.value)} placeholder="A." /></Field>
+      </div>
+      <Field label="GRADE & SECTION"><TextInput value={grade} onChange={e => setGrade(e.target.value)} placeholder="e.g. Grade 7 – Rizal" /></Field>
       <Field label="PASSWORD"><PasswordInput value={pass} onChange={e => setPass(e.target.value)} placeholder="At least 6 characters" /></Field>
       <Field label="CONFIRM PASSWORD"><PasswordInput value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="Retype password" /></Field>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 18, fontSize: 12, color: "var(--text-muted)", cursor: "pointer" }}>

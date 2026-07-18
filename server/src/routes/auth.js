@@ -166,10 +166,13 @@ router.post("/invite/:token/accept", authLimiter, async (req, res) => {
 
   let authedUser = student;
   if (student.password_hash === "UNCLAIMED") {
-    const { password, agreeToTerms } = req.body || {};
+    const { password, agreeToTerms, surname, given, mi, grade } = req.body || {};
     if (!password || password.length < 6) return res.status(400).json({ error: "Please choose a password of at least 6 characters." });
+    if (!surname?.trim() || !given?.trim()) return res.status(400).json({ error: "Please enter your Surname and Given Name." });
+    if (!grade?.trim()) return res.status(400).json({ error: "Please enter your Grade & Section." });
     if (!agreeToTerms) return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to continue." });
-    await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), student.id);
+    await db.prepare("UPDATE users SET password_hash = ?, surname = ?, given_name = ?, mi = ?, grade_section = ?, terms_accepted_at = ? WHERE id = ?")
+      .run(bcrypt.hashSync(password, 10), surname.trim(), given.trim(), (mi || "").trim(), grade.trim(), Date.now(), student.id);
     authedUser = await db.prepare("SELECT * FROM users WHERE id = ?").get(student.id);
   } else {
     const header = req.headers.authorization || "";
@@ -217,11 +220,14 @@ router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
     return res.json({ token: signToken(user), user: publicUser(user) });
   }
 
-  // New (or not-logged-in) student — needs email + password.
-  const { email, password, agreeToTerms } = req.body || {};
+  // New (or not-logged-in) student — needs email + password + identity
+  // details (full name and grade & section are required on the way in).
+  const { email, password, agreeToTerms, surname, given, mi, grade } = req.body || {};
   const emailNorm = (email || "").trim().toLowerCase();
   if (!emailNorm || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) return res.status(400).json({ error: "Please enter a valid email address." });
   if (!password || password.length < 6) return res.status(400).json({ error: "Please choose a password of at least 6 characters." });
+  if (!surname?.trim() || !given?.trim()) return res.status(400).json({ error: "Please enter your Surname and Given Name." });
+  if (!grade?.trim()) return res.status(400).json({ error: "Please enter your Grade & Section." });
   if (!agreeToTerms) return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to continue." });
 
   let user = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
@@ -232,13 +238,14 @@ router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
   if (!user) {
     const id = nanoid();
     await db.prepare(`
-      INSERT INTO users (id, role, email, password_hash, status, terms_accepted_at, created_at)
-      VALUES (?, 'student', ?, ?, 'active', ?, ?)
-    `).run(id, emailNorm, bcrypt.hashSync(password, 10), Date.now(), Date.now());
+      INSERT INTO users (id, role, email, password_hash, status, surname, given_name, mi, grade_section, terms_accepted_at, created_at)
+      VALUES (?, 'student', ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+    `).run(id, emailNorm, bcrypt.hashSync(password, 10), surname.trim(), given.trim(), (mi || "").trim(), grade.trim(), Date.now(), Date.now());
     user = await db.prepare("SELECT * FROM users WHERE id = ?").get(id);
   } else {
     // Invited-but-unclaimed account claiming itself through the class link.
-    await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), user.id);
+    await db.prepare("UPDATE users SET password_hash = ?, surname = ?, given_name = ?, mi = ?, grade_section = ?, terms_accepted_at = ? WHERE id = ?")
+      .run(bcrypt.hashSync(password, 10), surname.trim(), given.trim(), (mi || "").trim(), grade.trim(), Date.now(), user.id);
     user = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
   }
   await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(cls.id, user.id);
