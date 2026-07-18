@@ -35,6 +35,14 @@ function studentName(s) {
   return `${(s.surname || "").toUpperCase()}, ${s.given_name} ${s.mi}`.trim();
 }
 
+// "Surname, Given Name M." — the Phil-IRI record ordering/format. Falls back
+// to the account email for students without a filled profile.
+function surnameFirst(u) {
+  const s = (u.surname || "").trim(), g = (u.given_name || "").trim(), m = (u.mi || "").trim();
+  const nm = [s && g ? `${s},` : s, g, m].filter(Boolean).join(" ").trim();
+  return nm || u.email;
+}
+
 function deriveVocab(passage) {
   const words = passage.trim().split(/\s+/).filter(Boolean);
   const seen = new Set();
@@ -457,7 +465,8 @@ router.get("/assignments/:id/progress", async (req, res) => {
   const a = await loadAssignment(req.params.id);
   const subs = await db.prepare(`
     SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section, u.email FROM submissions s
-    JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? ORDER BY u.surname
+    JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ?
+    ORDER BY LOWER(u.surname), LOWER(u.given_name), LOWER(u.mi)
   `).all(a.id);
   // The monitor lists only students who have actually engaged with the
   // task (in progress or turned in) — students who haven't started are
@@ -467,9 +476,7 @@ router.get("/assignments/:id/progress", async (req, res) => {
     const miscues = JSON.parse(s.miscues || "{}");
     const m = s.status === "turned-in" ? metricsFor({ words: a.wordCount, miscues, seconds: s.seconds, correct: s.correct_count, items: a.questions.length }) : null;
     return {
-      // Students who joined via the class link may not have filled out
-      // their profile yet — fall back to the email they joined with.
-      submissionId: s.id, name: `${s.given_name} ${s.surname}`.trim() || s.email, grade: s.grade_section,
+      submissionId: s.id, name: surnameFirst(s), grade: s.grade_section,
       status: s.status, submittedAt: s.submitted_at || null,
       wpm: m?.wpm ?? null, wordScore: m?.score ?? null, comp: m?.acc ?? null,
       compLevel: m?.compLevel ?? null, wordLevel: m?.level ?? null,
@@ -500,7 +507,8 @@ router.get("/assignments/:id/results.csv", async (req, res) => {
   const { MISCUE_TYPES } = require("../docx");
   const subs = await db.prepare(`
     SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section, u.email FROM submissions s
-    JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? AND s.status = 'turned-in' ORDER BY u.surname
+    JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? AND s.status = 'turned-in'
+    ORDER BY LOWER(u.surname), LOWER(u.given_name), LOWER(u.mi)
   `).all(a.id);
 
   const esc = v => {
@@ -560,7 +568,7 @@ async function fullReport(submissionId, teacherId) {
   const m = metricsFor({ words: a.wordCount, miscues, seconds: sub.seconds, correct: sub.correct_count, items: a.questions.length });
   const answers = JSON.parse(sub.answers || "{}");
   return {
-    name: `${sub.given_name} ${sub.surname} ${sub.mi}`.trim() || sub.email, firstName: sub.given_name || sub.email,
+    name: surnameFirst(sub), firstName: sub.given_name || sub.email,
     grade: sub.grade_section, assignment: a.title, words: a.wordCount,
     seconds: sub.seconds, miscues, metrics: m, answers,
     questions: a.questions.map((q, i) => ({ n: i + 1, text: q.text, options: q.options, chosen: answers[i] ?? null, correct: q.correct })),
@@ -596,7 +604,11 @@ router.get("/assignments/:id/analytics", async (req, res) => {
 router.get("/assignments/:id/reports-all", async (req, res) => {
   if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
   const a = await loadAssignment(req.params.id);
-  const subs = await db.prepare("SELECT id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
+  const subs = await db.prepare(`
+    SELECT s.id FROM submissions s JOIN users u ON u.id = s.student_id
+    WHERE s.assignment_id = ? AND s.status = 'turned-in'
+    ORDER BY LOWER(u.surname), LOWER(u.given_name), LOWER(u.mi)
+  `).all(a.id);
   const records = [];
   for (const s of subs) records.push(await fullReport(s.id, req.user.id));
   res.json({ records });
@@ -605,7 +617,11 @@ router.get("/assignments/:id/reports-all", async (req, res) => {
 router.get("/assignments/:id/reports-all.docx", async (req, res) => {
   if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
   const a = await loadAssignment(req.params.id);
-  const subIds = await db.prepare("SELECT id, student_id FROM submissions WHERE assignment_id = ? AND status = 'turned-in'").all(a.id);
+  const subIds = await db.prepare(`
+    SELECT s.id FROM submissions s JOIN users u ON u.id = s.student_id
+    WHERE s.assignment_id = ? AND s.status = 'turned-in'
+    ORDER BY LOWER(u.surname), LOWER(u.given_name), LOWER(u.mi)
+  `).all(a.id);
   const { MISCUE_TYPES, buildForm3BulkDoc } = require("../docx");
   const records = [];
   for (const { id } of subIds) {

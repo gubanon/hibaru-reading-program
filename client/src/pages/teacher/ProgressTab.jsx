@@ -280,7 +280,7 @@ export default function ProgressTab() {
             <div key={r.submissionId} style={{ display: "grid", gridTemplateColumns: "1.9fr 1.2fr .7fr 1.1fr 1.1fr 1.1fr 100px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13.5 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <div style={{ width: 28, height: 28, borderRadius: "50%", background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontSize: 11.5, fontWeight: 700 }}>
-                  {r.name.split(" ").map(p => p[0]).join("").slice(0, 2)}
+                  {r.name.replace(/[,.]/g, "").split(" ").filter(Boolean).map(p => p[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <div>
                   <div style={{ fontWeight: 600 }}>{r.name}</div>
