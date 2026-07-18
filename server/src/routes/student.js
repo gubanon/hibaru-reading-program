@@ -42,7 +42,7 @@ router.get("/tasks", async (req, res) => {
     tasks.push({
       id: a.id, title: a.title, genre: a.genre, words: wordCount(a.passage),
       timeLimit: a.time_limit, deadline: a.deadline_iso, instructions: a.instructions,
-      status: sub.status, attempts: a.attempts
+      status: sub.status, attempts: a.attempts, submittedAt: sub.submitted_at || null
     });
   }
   res.json({ tasks });
@@ -99,13 +99,16 @@ router.post("/assignments/:id/quiz", async (req, res) => {
   let correct = 0;
   questions.forEach((q, i) => { if (Number(answers[i]) === q.correct_index) correct++; });
 
-  await db.prepare("UPDATE submissions SET status='turned-in', submitted_at=?, answers=?, correct_count=? WHERE id=?")
-    .run(Date.now(), JSON.stringify(answers), correct, sub.id);
+  // The visible assignment timer runs from the start of reading until this
+  // submit — never less than the reading-phase seconds already recorded.
+  const totalSeconds = Math.max(sub.seconds || 0, Math.round(Number(req.body?.totalSeconds) || 0));
+  await db.prepare("UPDATE submissions SET status='turned-in', submitted_at=?, answers=?, correct_count=?, total_seconds=? WHERE id=?")
+    .run(Date.now(), JSON.stringify(answers), correct, totalSeconds, sub.id);
 
   const fresh = await db.prepare("SELECT * FROM submissions WHERE id = ?").get(sub.id);
   const miscues = JSON.parse(fresh.miscues || "{}");
   const m = metricsFor({ words: wordCount(a.passage), miscues, seconds: fresh.seconds, correct, items: questions.length });
-  res.json({ result: { ...m, seconds: fresh.seconds } });
+  res.json({ result: { ...m, seconds: fresh.seconds, totalSeconds: fresh.total_seconds, submissionId: fresh.id } });
 });
 
 router.get("/results", async (req, res) => {
@@ -118,9 +121,32 @@ router.get("/results", async (req, res) => {
     const miscues = JSON.parse(s.miscues || "{}");
     const questions = (await db.prepare("SELECT COUNT(*) n FROM questions WHERE assignment_id = ?").get(s.assignment_id)).n;
     const m = metricsFor({ words: wordCount(s.passage), miscues, seconds: s.seconds, correct: s.correct_count, items: questions });
-    results.push({ title: s.title, date: s.submitted_at, wpm: m.wpm, score: m.score, level: m.level, correct: s.correct_count, items: questions, acc: m.acc, profile: m.profile });
+    results.push({ submissionId: s.id, title: s.title, date: s.submitted_at, wpm: m.wpm, score: m.score, level: m.level, correct: s.correct_count, items: questions, acc: m.acc, profile: m.profile });
   }
   res.json({ results });
+});
+
+// Detailed feedback on the student's OWN submission — mirrors the teacher's
+// report (miscue breakdown, marked-up passage, per-question right/wrong)
+// but is scoped strictly to submissions belonging to the requesting student.
+router.get("/submissions/:id/report", async (req, res) => {
+  const sub = await db.prepare("SELECT * FROM submissions WHERE id = ? AND student_id = ?").get(req.params.id, req.user.id);
+  if (!sub || sub.status !== "turned-in") return res.status(404).json({ error: "Result not found." });
+  const a = await db.prepare("SELECT * FROM assignments WHERE id = ?").get(sub.assignment_id);
+  if (!a) return res.status(404).json({ error: "Result not found." });
+  const questions = await db.prepare("SELECT * FROM questions WHERE assignment_id = ? ORDER BY seq").all(a.id);
+  const miscues = JSON.parse(sub.miscues || "{}");
+  const marked = JSON.parse(sub.marked || "[]");
+  const answers = JSON.parse(sub.answers || "{}");
+  const m = metricsFor({ words: wordCount(a.passage), miscues, seconds: sub.seconds, correct: sub.correct_count, items: questions.length });
+  res.json({ report: {
+    title: a.title, submittedAt: sub.submitted_at, seconds: sub.seconds, totalSeconds: sub.total_seconds,
+    metrics: m, miscues, marked,
+    questions: questions.map((q, i) => ({
+      n: i + 1, text: q.text, options: JSON.parse(q.options),
+      chosen: answers[i] ?? null, correct: q.correct_index
+    }))
+  } });
 });
 
 module.exports = router;

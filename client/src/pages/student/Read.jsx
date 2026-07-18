@@ -9,29 +9,52 @@ function timeText(secs) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export default function Read({ L, assignment, onFinished }) {
-  const [seconds, setSeconds] = useState(0);
+export default function Read({ L, assignment, timerStart, onTimerStart, onFinished }) {
+  // 3-second preparation countdown — the assignment timer, mic, and
+  // transcription only start once it reaches zero.
+  const [countdown, setCountdown] = useState(timerStart ? 0 : 3);
+  const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const intervalRef = useRef(null);
   const { transcript, start, stop, supported, error: speechError } = useSpeechRecognition();
   const { videoRef, error: camError } = useCamera(true);
 
   useEffect(() => {
+    if (countdown > 0) {
+      const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(t);
+    }
+    // Countdown finished — start (or resume) the continuous assignment
+    // timer, which keeps running through the comprehension questions and
+    // only stops when the student submits their answers.
+    const startedAt = timerStart || Date.now();
+    if (!timerStart) onTimerStart(startedAt);
     start();
-    intervalRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
+    intervalRef.current = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 250);
     return () => {
       stop();
       clearInterval(intervalRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [countdown]);
 
   async function finish() {
     setBusy(true);
     clearInterval(intervalRef.current);
     stop();
+    const seconds = Math.max(1, elapsed);
     const result = await api.post(`/student/assignments/${assignment.id}/finish-reading`, { seconds, transcript });
     onFinished({ ...result, seconds });
+  }
+
+  if (countdown > 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "80px 0" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, letterSpacing: ".08em", marginBottom: 10 }}>{L.getReady}</div>
+        <div style={{ fontSize: 96, fontWeight: 700, color: NAVY, lineHeight: 1 }}>{countdown}</div>
+        <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 14 }}>{L.readingStartsIn} {countdown}…</div>
+      </div>
+    );
   }
 
   return (
@@ -63,7 +86,7 @@ export default function Read({ L, assignment, onFinished }) {
         </div>
         <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 16, textAlign: "center" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".06em" }}>{L.timeLbl}</div>
-          <div style={{ fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{timeText(seconds)}</div>
+          <div style={{ fontSize: 32, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{timeText(elapsed)}</div>
           <div style={{ fontSize: 11.5, color: "var(--text-faint)" }}>{L.limitLbl} {assignment.timeLimit}</div>
         </div>
         <button disabled={busy} onClick={finish} style={{ border: "none", cursor: "pointer", padding: 14, borderRadius: 11, background: "oklch(0.55 0.13 155)", color: "#fff", fontFamily: "inherit", fontSize: 14.5, fontWeight: 700 }}>{L.finished}</button>

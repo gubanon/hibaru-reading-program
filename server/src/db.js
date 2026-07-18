@@ -202,6 +202,10 @@ function init() {
     // rather than just editing the CREATE TABLE above.
     await ensureColumn("users", "is_master_admin", "is_master_admin INTEGER NOT NULL DEFAULT 0");
     await ensureColumn("users", "password_owned", "password_owned INTEGER NOT NULL DEFAULT 0");
+    // Total wall-clock time from the start of reading until the quiz was
+    // submitted — the Phil-IRI reading rate keeps using `seconds` (reading
+    // phase only), this is the assignment-wide timer the student sees.
+    await ensureColumn("submissions", "total_seconds", "total_seconds INTEGER NOT NULL DEFAULT 0");
 
     // Admin credentials are read from env vars only (server/.env, gitignored,
     // never committed) — there is deliberately no real password baked into

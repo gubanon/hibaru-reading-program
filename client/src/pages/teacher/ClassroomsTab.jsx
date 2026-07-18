@@ -11,7 +11,14 @@ function StudentRow({ s, onRemove }) {
       <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--card-border)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>
         {(s.given[0] || s.email[0] || "?").toUpperCase()}
       </div>
-      <span style={{ fontWeight: 500 }}>{s.surname || s.given ? `${s.surname.toUpperCase()}, ${s.given} ${s.mi}`.trim() : s.email}</span>
+      <div style={{ minWidth: 0 }}>
+        <span style={{ fontWeight: 500 }}>{s.surname || s.given ? `${s.surname.toUpperCase()}, ${s.given} ${s.mi}`.trim() : s.email}</span>
+        {s.lastSubmittedAt && (
+          <div style={{ fontSize: 10.5, color: GREEN, fontWeight: 600 }}>
+            ✓ {s.submittedCount} submitted · last {new Date(s.lastSubmittedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+          </div>
+        )}
+      </div>
       <span style={{ color: "var(--text-faint-2)", fontSize: 11.5, marginLeft: "auto" }}>{s.grade}</span>
       <button onClick={() => onRemove(s)} title="Remove from classroom" style={{ border: "none", cursor: "pointer", background: "none", fontFamily: "inherit", fontSize: 13, color: "#B3261E", fontWeight: 700, padding: "0 2px" }}>✕</button>
     </div>

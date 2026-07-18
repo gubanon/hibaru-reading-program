@@ -6,11 +6,13 @@ function timeText(secs) {
 }
 
 export default function Done({ L, result, onBack }) {
+  // Fixed presentation order: Reading Rate → Word Score → Comprehension →
+  // Reading Level.
   const stats = [
     { label: L.readingRate, value: `${result.wpm} wpm`, sub: `${timeText(result.seconds)} ${L.readingTime}`, color: "var(--text)" },
     { label: L.wordScore, value: `${result.score}%`, sub: `${result.tm} ${L.miscuesDetected}`, color: levelColor(result.level) },
-    { label: L.readingLevel, value: result.level, sub: L.wordReadingLevel, color: levelColor(result.level) },
-    { label: L.comprehension, value: `${result.correct}/${result.items}`, sub: `${result.acc}% · ${result.compLevel}`, color: levelColor(result.compLevel) }
+    { label: L.comprehension, value: `${result.correct}/${result.items}`, sub: `${result.acc}% · ${result.compLevel}`, color: levelColor(result.compLevel) },
+    { label: L.readingLevel, value: result.level, sub: L.wordReadingLevel, color: levelColor(result.level) }
   ];
   return (
     <>
@@ -28,6 +30,11 @@ export default function Done({ L, result, onBack }) {
           </div>
         ))}
       </div>
+      {result.totalSeconds > 0 && (
+        <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--text-faint)", marginBottom: 16 }}>
+          ⏱ {timeText(result.totalSeconds)} {L.totalTime}
+        </div>
+      )}
       <div style={{ textAlign: "center" }}>
         <button onClick={onBack} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "12px 24px", borderRadius: 10, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 14, fontWeight: 600 }}>{L.backDash}</button>
       </div>

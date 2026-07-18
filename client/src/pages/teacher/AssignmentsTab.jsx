@@ -10,7 +10,7 @@ const inputStyle = { width: "100%", boxSizing: "border-box", fontFamily: "inheri
 
 function wordCount(text) { return (text || "").trim().split(/\s+/).filter(Boolean).length; }
 
-function ListView({ groups, onEdit, onView, onPrint, onDocx, saveToast }) {
+function ListView({ groups, onEdit, onView, onPrint, onDocx, onDelete, saveToast }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
@@ -35,6 +35,7 @@ function ListView({ groups, onEdit, onView, onPrint, onDocx, saveToast }) {
                     <button onClick={() => onView(a.id)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12, fontWeight: 600 }}>👁 View</button>
                     <button onClick={() => onPrint(a.id)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12, fontWeight: 600 }}>🖨 Print</button>
                     <button onClick={() => onDocx(a)} style={{ border: "none", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 12, fontWeight: 600 }}>⬇ DOCX</button>
+                    <button onClick={() => onDelete(a)} title="Delete assignment" style={{ border: "1px solid oklch(0.85 0.06 25)", cursor: "pointer", padding: "7px 13px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: "#B3261E" }}>🗑 Delete</button>
                   </div>
                 </div>
               ))}
@@ -201,6 +202,12 @@ export default function AssignmentsTab() {
   if (mode === "edit" && activeId) return <EditView id={activeId} onBack={() => setMode("list")} onSaved={onSaved} />;
   if (mode === "view" && activeId) return <ViewSheet id={activeId} onBack={() => setMode("list")} />;
 
+  async function onDelete(a) {
+    if (!confirm(`Delete "${a.title}"? This also removes all student submissions for it and can't be undone.`)) return;
+    await api.del(`/teacher/assignments/${a.id}`);
+    load();
+  }
+
   return (
     <ListView
       groups={groups}
@@ -209,6 +216,7 @@ export default function AssignmentsTab() {
       onView={id => { setActiveId(id); setMode("view"); }}
       onPrint={onPrint}
       onDocx={a => api.download(`/teacher/assignments/${a.id}/docx`, `Assignment - ${a.title}.docx`)}
+      onDelete={onDelete}
     />
   );
 }

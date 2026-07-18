@@ -1,11 +1,19 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { NAVY, levelColor, statusMeta , ACCENT } from "../../theme";
+import { NAVY, levelColor, statusMeta , ACCENT, GREEN } from "../../theme";
+import ResultDetail from "./ResultDetail";
+
+function submittedText(L, ts) {
+  return `✓ ${L.submittedOn} ${new Date(ts).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}`;
+}
 
 export default function Dashboard({ L, tasks, onStart, onProfile }) {
   const [results, setResults] = useState(null);
+  const [detailId, setDetailId] = useState(null);
 
   useEffect(() => { api.get("/student/results").then(d => setResults(d.results)); }, [tasks]);
+
+  if (detailId) return <ResultDetail L={L} submissionId={detailId} onBack={() => setDetailId(null)} />;
 
   return (
     <>
@@ -28,7 +36,11 @@ export default function Dashboard({ L, tasks, onStart, onProfile }) {
                 <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 6 }}>{t.instructions}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: sm.bg, color: sm.color, display: "inline-block", marginBottom: 9 }}>{sm.label}</div><br />
+                <div style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: sm.bg, color: sm.color, display: "inline-block", marginBottom: 6 }}>{sm.label}</div>
+                {t.status === "turned-in" && t.submittedAt && (
+                  <div style={{ fontSize: 11, fontWeight: 600, color: GREEN, marginBottom: 7 }}>{submittedText(L, t.submittedAt)}</div>
+                )}
+                <br />
                 <button onClick={() => onStart(t.id)} style={{ border: "none", cursor: "pointer", padding: "11px 20px", borderRadius: 10, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 13.5, fontWeight: 700 }}>{cta}</button>
               </div>
             </div>
@@ -41,17 +53,20 @@ export default function Dashboard({ L, tasks, onStart, onProfile }) {
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>📊 {L.myResults}</div>
         {results && results.length > 0 ? (
           <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr .8fr .9fr 1.1fr 1fr", gap: 8, padding: "11px 18px", fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
-              <div>TASK</div><div>DATE</div><div>WPM</div><div>SCORE</div><div>COMPREHENSION</div><div>PROFILE</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr .8fr .9fr 1.1fr 1fr .8fr", gap: 8, padding: "11px 18px", fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
+              <div>TASK</div><div>DATE</div><div>WPM</div><div>SCORE</div><div>COMPREHENSION</div><div>PROFILE</div><div></div>
             </div>
             {results.map((r, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr .8fr .9fr 1.1fr 1fr", gap: 8, padding: "12px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13 }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.8fr 1fr .8fr .9fr 1.1fr 1fr .8fr", gap: 8, padding: "12px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13 }}>
                 <div style={{ fontWeight: 600 }}>{r.title}</div>
-                <div style={{ color: "var(--text-faint)" }}>{new Date(r.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
+                <div style={{ color: "var(--text-faint)" }}>{new Date(r.date).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
                 <div>{r.wpm} wpm</div>
                 <div style={{ fontWeight: 600, color: levelColor(r.level) }}>{r.score}%</div>
                 <div>{r.correct}/{r.items} ({r.acc}%)</div>
                 <div style={{ fontWeight: 700, color: levelColor(r.profile) }}>{r.profile}</div>
+                <div>
+                  <button onClick={() => setDetailId(r.submissionId)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "6px 10px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: ACCENT }}>{L.viewDetails}</button>
+                </div>
               </div>
             ))}
           </div>

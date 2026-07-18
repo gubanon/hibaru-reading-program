@@ -255,7 +255,14 @@ export default function ProgressTab() {
                   <div style={{ fontSize: 11, color: "var(--text-faint-2)" }}>{r.grade}</div>
                 </div>
               </div>
-              <div><span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: sm.bg, color: sm.color }}>{sm.label}</span></div>
+              <div>
+                <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: sm.bg, color: sm.color }}>{sm.label}</span>
+                {r.status === "turned-in" && r.submittedAt && (
+                  <div style={{ fontSize: 10.5, color: GREEN, fontWeight: 600, marginTop: 4 }}>
+                    ✓ {new Date(r.submittedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </div>
+                )}
+              </div>
               <div>{r.wpm ?? "—"}</div>
               <div>{r.wordScore != null ? r.wordScore + "%" : "—"}</div>
               <div>{r.comp != null ? r.comp + "%" : "—"}</div>

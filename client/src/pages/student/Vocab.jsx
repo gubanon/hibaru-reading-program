@@ -6,15 +6,22 @@ const SpeechRecognitionImpl = typeof window !== "undefined"
   ? (window.SpeechRecognition || window.webkitSpeechRecognition)
   : null;
 
+function normalize(s) {
+  return (s || "").toLowerCase().replace(/[^a-z0-9À-ɏ\s]/g, "").trim();
+}
+
 export default function Vocab({ L, lang, assignment, practiced, setPracticed, onNext }) {
   const [activeWord, setActiveWord] = useState(null);
   const [warn, setWarn] = useState("");
   const recRef = useRef(null);
 
   const vocabAll = Object.keys(practiced).length >= assignment.vocab.length;
+  // Words unlock strictly in order: only the first unpracticed word is
+  // tappable; everything after it stays locked until it's said correctly.
+  const nextWord = assignment.vocab.find(v => !practiced[v.word])?.word ?? null;
 
   function practiceWord(w) {
-    if (practiced[w]) return;
+    if (practiced[w] || w !== nextWord) return;
     setWarn("");
     if (!SpeechRecognitionImpl) {
       // No mic support in this browser — still let the student mark it practiced.
@@ -24,10 +31,18 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
     const rec = new SpeechRecognitionImpl();
     rec.lang = lang === "fil" ? "fil-PH" : "en-US";
     rec.interimResults = false;
-    rec.maxAlternatives = 1;
+    rec.maxAlternatives = 5;
     recRef.current = rec;
     setActiveWord(w);
-    rec.onresult = () => markPracticed(w);
+    rec.onresult = (e) => {
+      // The word only unlocks when one of the recognizer's guesses actually
+      // contains it — saying anything no longer counts as "correct".
+      const target = normalize(w);
+      const alts = Array.from(e.results[0]).map(alt => normalize(alt.transcript));
+      const said = alts.some(t => t === target || t.includes(target) || target.includes(t) && t.length >= Math.ceil(target.length * 0.7));
+      if (said) markPracticed(w);
+      else { setActiveWord(null); setWarn(L.tryAgainWord); }
+    };
     rec.onerror = (e) => {
       setActiveWord(null);
       if (e.error !== "aborted") setWarn("Didn't catch that — tap the word and try again.");
@@ -38,6 +53,7 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
 
   async function markPracticed(w) {
     setActiveWord(null);
+    setWarn("");
     const { practiced: fresh } = await api.post(`/student/assignments/${assignment.id}/practice`, { word: w });
     setPracticed(fresh);
   }
@@ -54,13 +70,15 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
         {assignment.vocab.map(v => {
           const done = !!practiced[v.word];
           const listening = activeWord === v.word;
+          const isNext = v.word === nextWord;
+          const locked = !done && !isNext;
           return (
-            <button key={v.word} onClick={() => practiceWord(v.word)}
-              style={{ border: `2px solid ${done ? "oklch(0.7 0.1 155)" : listening ? NAVY : "var(--input-border)"}`, cursor: "pointer", padding: "18px 14px", borderRadius: 14, background: done ? "oklch(0.96 0.03 155)" : "var(--card-bg)", fontFamily: "inherit", textAlign: "center" }}>
+            <button key={v.word} onClick={() => practiceWord(v.word)} disabled={locked}
+              style={{ border: `2px solid ${done ? "oklch(0.7 0.1 155)" : listening ? NAVY : "var(--input-border)"}`, cursor: locked ? "default" : "pointer", padding: "18px 14px", borderRadius: 14, background: done ? "oklch(0.96 0.03 155)" : "var(--card-bg)", fontFamily: "inherit", textAlign: "center", opacity: locked ? 0.45 : 1 }}>
               <div style={{ fontSize: 19, fontWeight: 700, color: "var(--text)" }}>{v.word}</div>
               <div style={{ fontSize: 11.5, marginTop: 6, lineHeight: 1.5, color: "var(--text-muted)" }}>{lang === "fil" ? v.defFil : v.def}</div>
               <div style={{ fontSize: 12, marginTop: 8, fontWeight: 600, color: done ? "oklch(0.5 0.12 155)" : listening ? NAVY : "var(--text-faint)" }}>
-                {done ? L.unlocked : listening ? L.listening : L.tapSay}
+                {done ? L.unlocked : listening ? L.listening : locked ? L.lockedWord : L.tapSay}
               </div>
             </button>
           );

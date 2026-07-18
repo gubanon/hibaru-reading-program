@@ -117,11 +117,24 @@ router.get("/classrooms", async (req, res) => {
     `).all(c.id);
     const invites = await db.prepare("SELECT * FROM classroom_invites WHERE classroom_id = ? AND status = 'pending' ORDER BY created_at DESC").all(c.id);
     const assignmentCount = (await db.prepare("SELECT COUNT(*) n FROM assignments WHERE classroom_id = ?").get(c.id)).n;
+    // Latest turned-in submission per student, scoped to THIS classroom's
+    // assignments — powers the "✓ submitted (when)" note on the roster.
+    const lastSubs = await db.prepare(`
+      SELECT s.student_id, MAX(s.submitted_at) as last_at, COUNT(*) as done_count
+      FROM submissions s JOIN assignments a ON a.id = s.assignment_id
+      WHERE a.classroom_id = ? AND s.status = 'turned-in'
+      GROUP BY s.student_id
+    `).all(c.id);
+    const lastByStudent = new Map(lastSubs.map(r => [r.student_id, r]));
     out.push({
       id: c.id, name: c.name, assignmentCount,
-      students: students.map(s => ({
-        id: s.id, surname: s.surname, given: s.given_name, mi: s.mi, sex: s.sex, grade: s.grade_section, email: s.email
-      })),
+      students: students.map(s => {
+        const last = lastByStudent.get(s.id);
+        return {
+          id: s.id, surname: s.surname, given: s.given_name, mi: s.mi, sex: s.sex, grade: s.grade_section, email: s.email,
+          lastSubmittedAt: last ? Number(last.last_at) : null, submittedCount: last ? Number(last.done_count) : 0
+        };
+      }),
       // joinUrl lets the teacher hand the link out directly (Messenger/SMS)
       // when the invite email is slow or lands in spam — same token the
       // email carries, and only ever shown to the classroom's own teacher.
@@ -384,6 +397,15 @@ router.put("/assignments/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+router.delete("/assignments/:id", async (req, res) => {
+  const id = req.params.id;
+  if (!(await ownsAssignment(req.user.id, id))) return res.status(404).json({ error: "Assignment not found." });
+  // ON DELETE CASCADE removes this assignment's questions, vocab words, and
+  // all student submissions along with it.
+  await db.prepare("DELETE FROM assignments WHERE id = ?").run(id);
+  res.json({ ok: true });
+});
+
 router.get("/assignments/:id/docx", async (req, res) => {
   if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
   const a = await loadAssignment(req.params.id);
@@ -438,7 +460,8 @@ router.get("/assignments/:id/progress", async (req, res) => {
     const m = s.status === "turned-in" ? metricsFor({ words: a.wordCount, miscues, seconds: s.seconds, correct: s.correct_count, items: a.questions.length }) : null;
     return {
       submissionId: s.id, name: `${s.given_name} ${s.surname}`.trim(), grade: s.grade_section,
-      status: s.status, wpm: m?.wpm ?? null, wordScore: m?.score ?? null, comp: m?.acc ?? null,
+      status: s.status, submittedAt: s.submitted_at || null,
+      wpm: m?.wpm ?? null, wordScore: m?.score ?? null, comp: m?.acc ?? null,
       profile: m?.profile ?? null, hasReport: !!m
     };
   });
