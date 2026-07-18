@@ -1,10 +1,12 @@
 const express = require("express");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const { nanoid } = require("nanoid");
 const db = require("../db");
 const { signToken, requireAuth, JWT_SECRET } = require("../auth");
+const { sendEmail, escapeHtml, CLIENT_URL } = require("../email");
 const loginAttempts = require("../loginAttempts");
 
 const router = express.Router();
@@ -253,10 +255,63 @@ router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
   res.json({ token: signToken(user), user: publicUser(user) });
 });
 
-router.post("/forgot", authLimiter, (req, res) => {
-  // No email service wired up — this simply doesn't reveal whether the
-  // account exists, matching the prototype's messaging.
-  res.json({ ok: true, message: "If an account exists for that email, a password reset link is on its way." });
+// Real password reset: email a single-use link valid for 1 hour. The
+// response never reveals whether the account exists.
+router.post("/forgot", authLimiter, async (req, res) => {
+  const generic = { ok: true, message: "If an account exists for that email, a password reset link is on its way." };
+  const emailNorm = (req.body?.email || "").trim().toLowerCase();
+  if (!emailNorm) return res.json(generic);
+  const user = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
+  if (user && user.password_hash !== "UNCLAIMED") {
+    const token = crypto.randomBytes(24).toString("base64url");
+    const hash = crypto.createHash("sha256").update(token).digest("hex");
+    await db.prepare("UPDATE users SET reset_token_hash = ?, reset_expires = ? WHERE id = ?")
+      .run(hash, Date.now() + 60 * 60 * 1000, user.id);
+    const link = `${CLIENT_URL}/reset/${token}`;
+    await sendEmail({
+      to: emailNorm,
+      subject: "Reset your Project HIBARU password",
+      html: `
+        <p>Someone (hopefully you) asked to reset the password for the Project HIBARU account <strong>${escapeHtml(emailNorm)}</strong>.</p>
+        <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#22335E;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">Set a new password</a></p>
+        <p>Or copy this link into your browser:<br>${link}</p>
+        <p style="color:#888;font-size:12px;">This link works once and expires in 1 hour. If you didn't ask for this, you can safely ignore it — your password stays unchanged.</p>
+      `
+    });
+  }
+  res.json(generic);
+});
+
+async function findByResetToken(token) {
+  const hash = crypto.createHash("sha256").update(String(token)).digest("hex");
+  const user = await db.prepare("SELECT * FROM users WHERE reset_token_hash = ?").get(hash);
+  if (!user || !user.reset_expires || Number(user.reset_expires) < Date.now()) return null;
+  return user;
+}
+
+router.get("/reset/:token", async (req, res) => {
+  const user = await findByResetToken(req.params.token);
+  if (!user) return res.status(404).json({ error: "This reset link is invalid or has expired — request a new one from the sign-in page." });
+  // Masked email so the page can show whose password is being reset
+  // without fully exposing the address if the link leaks.
+  const [local, domain] = user.email.split("@");
+  const masked = domain ? `${local[0]}${"*".repeat(Math.max(2, local.length - 1))}@${domain}` : user.email;
+  res.json({ ok: true, email: masked });
+});
+
+router.post("/reset/:token", authLimiter, async (req, res) => {
+  const user = await findByResetToken(req.params.token);
+  if (!user) return res.status(404).json({ error: "This reset link is invalid or has expired — request a new one from the sign-in page." });
+  const { password } = req.body || {};
+  if (!password || password.length < 6) return res.status(400).json({ error: "Please choose a password of at least 6 characters." });
+  const cost = user.role === "admin" ? 12 : 10;
+  // password_owned stops the admin env-var seeding from ever overwriting a
+  // password the user set themselves.
+  await db.prepare("UPDATE users SET password_hash = ?, password_owned = 1, reset_token_hash = NULL, reset_expires = NULL WHERE id = ?")
+    .run(bcrypt.hashSync(password, cost), user.id);
+  loginAttempts.recordSuccess(user.email);
+  const fresh = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
+  res.json({ token: signToken(fresh), user: publicUser(fresh) });
 });
 
 router.get("/me", requireAuth, async (req, res) => {

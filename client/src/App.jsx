@@ -4,6 +4,7 @@ import { ThemeProvider } from "./theme/ThemeContext";
 import Login from "./pages/Login";
 import Join from "./pages/Join";
 import ClassJoin from "./pages/ClassJoin";
+import ResetPassword from "./pages/ResetPassword";
 import AdminConsole from "./pages/admin/AdminConsole";
 import TeacherConsole from "./pages/teacher/TeacherConsole";
 import StudentConsole from "./pages/student/StudentConsole";
@@ -36,6 +37,7 @@ function App() {
             <Route path="/" element={<LoginRoute />} />
             <Route path="/join/:token" element={<Join />} />
             <Route path="/class/:token" element={<ClassJoin />} />
+            <Route path="/reset/:token" element={<ResetPassword />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/admin" element={<Protected role="admin"><AdminConsole /></Protected>} />

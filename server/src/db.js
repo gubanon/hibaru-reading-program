@@ -207,6 +207,10 @@ function init() {
     // submitted — the Phil-IRI reading rate keeps using `seconds` (reading
     // phase only), this is the assignment-wide timer the student sees.
     await ensureColumn("submissions", "total_seconds", "total_seconds INTEGER NOT NULL DEFAULT 0");
+    // Password reset links: only a SHA-256 hash of the emailed token is
+    // stored, with a 1-hour expiry; both clear on use.
+    await ensureColumn("users", "reset_token_hash", "reset_token_hash TEXT");
+    await ensureColumn("users", "reset_expires", "reset_expires INTEGER");
     // Student profile pictures — stored inline as a small base64 data URL
     // (client resizes to 256px before upload) so they live in Turso and
     // survive redeploys; Render's local disk doesn't.
