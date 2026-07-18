@@ -15,6 +15,23 @@ function flattenAssignments(groups) {
 // student's name and details.
 function Form3Record({ rec }) {
   const m = rec.metrics;
+  // Per-item responses like the paper form: two numbered columns (1–5 /
+  // 6–10, or more), each showing the chosen letter with ✓ or ✗. Unused
+  // slots stay as blank lines.
+  const items = (rec.questions || []).map(q => ({ letter: q.chosen != null ? ["A", "B", "C", "D"][q.chosen] : "—", ok: q.chosen === q.correct }));
+  const slots = Math.max(10, items.length + (items.length % 2));
+  const half = Math.ceil(slots / 2);
+  const respSlot = (n) => {
+    const it = items[n - 1];
+    return (
+      <div key={n} style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span>{n}.</span>
+        <span style={{ borderBottom: "1px solid #000", minWidth: 90, padding: "0 10px", fontWeight: 700, textAlign: "center" }}>
+          {it ? `${it.letter} ${it.ok ? "✓" : "✗"}` : " "}
+        </span>
+      </div>
+    );
+  };
   return (
     <div data-record="1" data-print-area="1" style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: "44px 52px", fontFamily: "'Times New Roman',Georgia,serif", fontSize: 14, color: "#000", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -38,6 +55,14 @@ function Form3Record({ rec }) {
           <b>Total time in Reading the Text:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{Math.floor(rec.seconds / 60)}</span> minutes (= <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{rec.seconds}</span> seconds)<br />
           <b>Reading Rate:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.wpm}</span> words per minute<br />
           <b>Responses to Questions:</b> Score <span style={{ borderBottom: "1px solid #000", padding: "0 10px" }}>{m.correct} / {m.items}</span> = <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.acc}</span> %
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 60px", margin: "12px 0 0 30px", maxWidth: 440 }}>
+          {Array.from({ length: half }, (_, i) => (
+            <Fragment key={i}>
+              {respSlot(i + 1)}
+              {respSlot(i + half + 1)}
+            </Fragment>
+          ))}
         </div>
       </div>
       <div style={{ borderTop: "2px solid #000", paddingTop: 10, marginBottom: 18 }}>

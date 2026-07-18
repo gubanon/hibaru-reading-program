@@ -159,26 +159,27 @@ function buildConsolidatedDoc(classroomName, assignment, males, females) {
 
 // ---- Phil-IRI Form 3 Learner's Record (single or bulk, one section per record) ----
 function form3Section(rec) {
-  const responsesLeft = [];
-  const responsesRight = [];
-  rec.responses.forEach((rr, i) => {
-    const row = new TableRow({
+  // Per-item responses in the official Form 3 layout: two numbered columns
+  // (1–5 left, 6–10 right, or more if the quiz has extra items), each slot
+  // carrying the chosen letter with ✓ for correct / ✗ for incorrect.
+  // Slots beyond the quiz's item count print as blank lines, matching the
+  // paper form.
+  const slots = Math.max(10, rec.responses.length + (rec.responses.length % 2));
+  const half = Math.ceil(slots / 2);
+  const respRows = [];
+  for (let i = 0; i < half; i++) {
+    const l = rec.responses[i];
+    const r2 = rec.responses[i + half];
+    respRows.push(new TableRow({
       children: [
-        cell(`${rr.n}.`, { left: true, noBorder: true }),
-        cell(`${rr.letter} ${rr.mark}`, { b: true, noBorder: true })
+        cell(`${i + 1}.`, { left: true, noBorder: true, sz: 20 }),
+        cell(l ? `${l.letter} ${l.mark}` : "____________", { b: !!l, noBorder: true, left: true, sz: 20 }),
+        cell(`${i + half + 1}.`, { left: true, noBorder: true, sz: 20 }),
+        cell(r2 ? `${r2.letter} ${r2.mark}` : "____________", { b: !!r2, noBorder: true, left: true, sz: 20 })
       ]
-    });
-    if (i < 5) responsesLeft.push(row); else responsesRight.push(row);
-  });
-  const responseTable = new Table({
-    width: { size: 60, type: WidthType.PERCENTAGE },
-    rows: rec.responses.map(rr => new TableRow({
-      children: [
-        cell(`${rr.n}.`, { left: true, noBorder: true, sz: 20 }),
-        cell(`${rr.letter} ${rr.mark}`, { b: true, noBorder: true, sz: 20 })
-      ]
-    }))
-  });
+    }));
+  }
+  const responseTable = new Table({ width: { size: 70, type: WidthType.PERCENTAGE }, rows: respRows });
 
   const miscueRows = rec.miscueRows.map(mr => new TableRow({
     children: [
