@@ -128,6 +128,9 @@ router.get("/classrooms", async (req, res) => {
     const lastByStudent = new Map(lastSubs.map(r => [r.student_id, r]));
     out.push({
       id: c.id, name: c.name, assignmentCount,
+      // The classroom's single shareable join link — anyone with it can
+      // join THIS classroom (new students create their account on the way in).
+      classJoinUrl: c.join_token ? `${CLIENT_URL}/class/${c.join_token}` : null,
       students: students.map(s => {
         const last = lastByStudent.get(s.id);
         return {
@@ -148,7 +151,8 @@ router.post("/classrooms", async (req, res) => {
   const name = (req.body?.name || "").trim();
   if (!name) return res.status(400).json({ error: "Classroom name is required." });
   const id = nanoid();
-  await db.prepare("INSERT INTO classrooms (id, teacher_id, name, created_at) VALUES (?, ?, ?, ?)").run(id, req.user.id, name, Date.now());
+  await db.prepare("INSERT INTO classrooms (id, teacher_id, name, join_token, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(id, req.user.id, name, inviteToken(), Date.now());
   res.json({ id, name });
 });
 
@@ -452,16 +456,23 @@ router.get("/assignments/:id/progress", async (req, res) => {
   if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
   const a = await loadAssignment(req.params.id);
   const subs = await db.prepare(`
-    SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section FROM submissions s
+    SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section, u.email FROM submissions s
     JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? ORDER BY u.surname
   `).all(a.id);
-  const rows = subs.map(s => {
+  // The monitor lists only students who have actually engaged with the
+  // task (in progress or turned in) — students who haven't started are
+  // excluded entirely, surfaced only as a count.
+  const engaged = subs.filter(s => s.status !== "not-started");
+  const rows = engaged.map(s => {
     const miscues = JSON.parse(s.miscues || "{}");
     const m = s.status === "turned-in" ? metricsFor({ words: a.wordCount, miscues, seconds: s.seconds, correct: s.correct_count, items: a.questions.length }) : null;
     return {
-      submissionId: s.id, name: `${s.given_name} ${s.surname}`.trim(), grade: s.grade_section,
+      // Students who joined via the class link may not have filled out
+      // their profile yet — fall back to the email they joined with.
+      submissionId: s.id, name: `${s.given_name} ${s.surname}`.trim() || s.email, grade: s.grade_section,
       status: s.status, submittedAt: s.submitted_at || null,
       wpm: m?.wpm ?? null, wordScore: m?.score ?? null, comp: m?.acc ?? null,
+      compLevel: m?.compLevel ?? null, wordLevel: m?.level ?? null,
       profile: m?.profile ?? null, hasReport: !!m
     };
   });
@@ -469,9 +480,66 @@ router.get("/assignments/:id/progress", async (req, res) => {
   const cls = await db.prepare("SELECT name FROM classrooms WHERE id=?").get(a.classId);
   res.json({
     title: a.title, deadline: a.deadlineISO, className: cls?.name,
-    completionPct: rows.length ? Math.round(turnedIn.length / rows.length * 100) : 0,
+    completionPct: subs.length ? Math.round(turnedIn.length / subs.length * 100) : 0,
+    notStartedCount: subs.length - engaged.length,
     rows
   });
+});
+
+// Full-transparency spreadsheet export: one row per turned-in student with
+// every metric, every miscue-type count, and the individual miscues
+// themselves (word + type, in passage order). Opens directly in Excel.
+router.get("/assignments/:id/results.csv", async (req, res) => {
+  if (!(await ownsAssignment(req.user.id, req.params.id))) return res.status(404).json({ error: "Assignment not found." });
+  const a = await loadAssignment(req.params.id);
+  const { MISCUE_TYPES } = require("../docx");
+  const subs = await db.prepare(`
+    SELECT s.*, u.surname, u.given_name, u.mi, u.grade_section, u.email FROM submissions s
+    JOIN users u ON u.id = s.student_id WHERE s.assignment_id = ? AND s.status = 'turned-in' ORDER BY u.surname
+  `).all(a.id);
+
+  const esc = v => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = [
+    "Student", "Grade & Section", "Submitted At",
+    "Reading Time (s)", "Total Time incl. Questions (s)", "Reading Rate (wpm)",
+    "Comprehension Score", "Comprehension %", "Comprehension Level",
+    "Words in Passage", "Total Miscues",
+    ...MISCUE_TYPES.map(t => t.label),
+    "Word Reading Score (%)", "Word Reading Level", "Reading Profile",
+    "Individual Miscues (word: type)",
+    ...a.questions.map((q, i) => `Q${i + 1} Answer`),
+    ...a.questions.map((q, i) => `Q${i + 1} Correct?`)
+  ];
+  const lines = [header.map(esc).join(",")];
+  for (const s of subs) {
+    const miscues = JSON.parse(s.miscues || "{}");
+    const marked = JSON.parse(s.marked || "[]");
+    const answers = JSON.parse(s.answers || "{}");
+    const m = metricsFor({ words: a.wordCount, miscues, seconds: s.seconds, correct: s.correct_count, items: a.questions.length });
+    const typeLabel = key => (MISCUE_TYPES.find(t => t.key === key) || {}).label || key;
+    const individual = marked.filter(w => w.type).map(w => `${w.word}: ${typeLabel(w.type)}`).join("; ");
+    const letters = ["A", "B", "C", "D"];
+    const displayName = `${(s.surname || "").toUpperCase()}, ${s.given_name} ${s.mi}`.replace(/^,\s*/, "").trim() || s.email;
+    lines.push([
+      displayName, s.grade_section,
+      s.submitted_at ? new Date(Number(s.submitted_at)).toLocaleString("en-US") : "",
+      s.seconds, s.total_seconds || "", m.wpm,
+      `${m.correct} / ${m.items}`, m.acc, m.compLevel,
+      m.words, m.tm,
+      ...MISCUE_TYPES.map(t => miscues[t.key] || 0),
+      m.score, m.level, m.profile,
+      individual,
+      ...a.questions.map((q, i) => answers[i] != null ? `${letters[answers[i]]}. ${q.options[answers[i]] ?? ""}` : "—"),
+      ...a.questions.map((q, i) => Number(answers[i]) === q.correct ? "Correct" : "Wrong")
+    ].map(esc).join(","));
+  }
+  // BOM so Excel opens it as UTF-8 (student names can carry ñ etc).
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="Results - ${a.title}.csv"`);
+  res.send("﻿" + lines.join("\r\n"));
 });
 
 async function fullReport(submissionId, teacherId) {

@@ -177,6 +177,60 @@ router.post("/invite/:token/accept", authLimiter, async (req, res) => {
   res.json({ token: signToken(authedUser), user: publicUser(authedUser) });
 });
 
+// ===== Classroom-wide join link (one per classroom) =====
+// Unlike the per-student email invites above, every classroom has exactly
+// one shareable /class/<token> link. A brand-new student supplies their
+// email + password right here; an existing student must be logged in.
+router.get("/class-invite/:token", async (req, res) => {
+  const cls = await db.prepare("SELECT id, name FROM classrooms WHERE join_token = ?").get(req.params.token);
+  if (!cls) return res.status(404).json({ error: "This class link is invalid." });
+  res.json({ classroomName: cls.name });
+});
+
+router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
+  const cls = await db.prepare("SELECT id, name FROM classrooms WHERE join_token = ?").get(req.params.token);
+  if (!cls) return res.status(404).json({ error: "This class link is invalid." });
+
+  // Logged-in student joining directly.
+  const header = req.headers.authorization || "";
+  const bearer = header.startsWith("Bearer ") ? header.slice(7) : null;
+  let payload = null;
+  try { payload = bearer && jwt.verify(bearer, JWT_SECRET); } catch { payload = null; }
+  if (payload) {
+    const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(payload.id);
+    if (!user || user.role !== "student") return res.status(403).json({ error: "Only student accounts can join a classroom." });
+    await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(cls.id, user.id);
+    return res.json({ token: signToken(user), user: publicUser(user) });
+  }
+
+  // New (or not-logged-in) student — needs email + password.
+  const { email, password, agreeToTerms } = req.body || {};
+  const emailNorm = (email || "").trim().toLowerCase();
+  if (!emailNorm || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm)) return res.status(400).json({ error: "Please enter a valid email address." });
+  if (!password || password.length < 6) return res.status(400).json({ error: "Please choose a password of at least 6 characters." });
+  if (!agreeToTerms) return res.status(400).json({ error: "Please accept the Terms & Conditions and Privacy Policy to continue." });
+
+  let user = await db.prepare("SELECT * FROM users WHERE email = ?").get(emailNorm);
+  if (user && user.role !== "student") return res.status(409).json({ error: "That email belongs to a non-student account." });
+  if (user && user.password_hash !== "UNCLAIMED") {
+    return res.status(401).json({ error: "An account with that email already exists — please log in first, then open this link again.", code: "LOGIN_REQUIRED" });
+  }
+  if (!user) {
+    const id = nanoid();
+    await db.prepare(`
+      INSERT INTO users (id, role, email, password_hash, status, terms_accepted_at, created_at)
+      VALUES (?, 'student', ?, ?, 'active', ?, ?)
+    `).run(id, emailNorm, bcrypt.hashSync(password, 10), Date.now(), Date.now());
+    user = await db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+  } else {
+    // Invited-but-unclaimed account claiming itself through the class link.
+    await db.prepare("UPDATE users SET password_hash = ?, terms_accepted_at = ? WHERE id = ?").run(bcrypt.hashSync(password, 10), Date.now(), user.id);
+    user = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
+  }
+  await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(cls.id, user.id);
+  res.json({ token: signToken(user), user: publicUser(user) });
+});
+
 router.post("/forgot", authLimiter, (req, res) => {
   // No email service wired up — this simply doesn't reveal whether the
   // account exists, matching the prototype's messaging.

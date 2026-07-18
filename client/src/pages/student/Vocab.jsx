@@ -35,11 +35,12 @@ export default function Vocab({ L, lang, assignment, practiced, setPracticed, on
     recRef.current = rec;
     setActiveWord(w);
     rec.onresult = (e) => {
-      // The word only unlocks when one of the recognizer's guesses actually
-      // contains it — saying anything no longer counts as "correct".
+      // High-sensitivity evaluation: the word only unlocks when one of the
+      // recognizer's guesses IS the target word (or contains it as an exact
+      // whole word) — no partial/fuzzy credit.
       const target = normalize(w);
       const alts = Array.from(e.results[0]).map(alt => normalize(alt.transcript));
-      const said = alts.some(t => t === target || t.includes(target) || target.includes(t) && t.length >= Math.ceil(target.length * 0.7));
+      const said = alts.some(t => t === target || t.split(/\s+/).includes(target));
       if (said) markPracticed(w);
       else { setActiveWord(null); setWarn(L.tryAgainWord); }
     };

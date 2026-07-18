@@ -235,17 +235,28 @@ export default function ProgressTab() {
           style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", border: "1px solid var(--input-border)", borderRadius: 8, background: "var(--card-bg)" }}>
           {assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
         </select>
+        <button data-noprint="1"
+          onClick={() => api.download(`/teacher/assignments/${assignmentId}/results.csv`, `Results - ${progress.title}.csv`)}
+          style={{ border: "none", cursor: "pointer", padding: "10px 18px", borderRadius: 9, background: GREEN, color: "#fff", fontFamily: "inherit", fontSize: 13, fontWeight: 700 }}>
+          ⬇ Export CSV (full details + miscues)
+        </button>
         <button data-noprint="1" onClick={() => setPrintAll(true)} style={{ border: "none", cursor: "pointer", padding: "10px 18px", borderRadius: 9, background: "#F5B301", color: NAVY, fontFamily: "inherit", fontSize: 13, fontWeight: 700 }}>⬇ Download Result (all students)</button>
       </div>
-      <div style={{ margin: "14px 0 20px", maxWidth: 420 }}><Bar pct={progress.completionPct} color={GREEN} /></div>
-      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr .8fr .9fr 1fr 1.1fr 100px", gap: 8, padding: "12px 18px", fontSize: 11.5, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
-          <div>STUDENT</div><div>STATUS</div><div>WPM</div><div>WORD SCORE</div><div>COMPREHENSION</div><div>READING PROFILE</div><div></div>
+      <div style={{ margin: "14px 0 6px", maxWidth: 420 }}><Bar pct={progress.completionPct} color={GREEN} /></div>
+      {progress.notStartedCount > 0 && (
+        <div style={{ fontSize: 12, color: "var(--text-faint)", marginBottom: 14 }}>
+          {progress.notStartedCount} student{progress.notStartedCount === 1 ? " hasn't" : "s haven't"} started yet — they'll appear here once they begin.
+        </div>
+      )}
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, overflow: "hidden", marginTop: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.9fr 1.2fr .7fr 1.1fr 1.1fr 1.1fr 100px", gap: 8, padding: "12px 18px", fontSize: 11, fontWeight: 700, color: "var(--text-faint)", letterSpacing: ".04em", borderBottom: "1px solid var(--divider)" }}>
+          <div>STUDENT</div><div>STATUS</div><div>WPM</div>
+          <div>PART A · COMPREHENSION</div><div>PART B · WORD SCORE</div><div>PART C · PROFILE</div><div></div>
         </div>
         {progress.rows.map(r => {
           const sm = statusMeta[r.status];
           return (
-            <div key={r.submissionId} style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr .8fr .9fr 1fr 1.1fr 100px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13.5 }}>
+            <div key={r.submissionId} style={{ display: "grid", gridTemplateColumns: "1.9fr 1.2fr .7fr 1.1fr 1.1fr 1.1fr 100px", gap: 8, padding: "13px 18px", alignItems: "center", borderBottom: "1px solid var(--divider)", fontSize: 13.5 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <div style={{ width: 28, height: 28, borderRadius: "50%", background: NAVY, color: "#fff", display: "grid", placeItems: "center", fontSize: 11.5, fontWeight: 700 }}>
                   {r.name.split(" ").map(p => p[0]).join("").slice(0, 2)}
@@ -264,13 +275,30 @@ export default function ProgressTab() {
                 )}
               </div>
               <div>{r.wpm ?? "—"}</div>
-              <div>{r.wordScore != null ? r.wordScore + "%" : "—"}</div>
-              <div>{r.comp != null ? r.comp + "%" : "—"}</div>
-              <div style={{ fontWeight: 600, color: r.profile ? levelColor(r.profile) : "var(--text-faint-2)" }}>{r.profile || "—"}</div>
+              <div>
+                {r.comp != null ? (
+                  <>
+                    <div style={{ fontWeight: 600 }}>{r.comp}%</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: levelColor(r.compLevel) }}>{r.compLevel}</div>
+                  </>
+                ) : "—"}
+              </div>
+              <div>
+                {r.wordScore != null ? (
+                  <>
+                    <div style={{ fontWeight: 600 }}>{r.wordScore}%</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: levelColor(r.wordLevel) }}>{r.wordLevel}</div>
+                  </>
+                ) : "—"}
+              </div>
+              <div style={{ fontWeight: 700, color: r.profile ? levelColor(r.profile) : "var(--text-faint-2)" }}>{r.profile || "—"}</div>
               <div>{r.hasReport && <button onClick={() => setReportId(r.submissionId)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "6px 12px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: ACCENT }}>Report →</button>}</div>
             </div>
           );
         })}
+        {!progress.rows.length && (
+          <div style={{ padding: 18, fontSize: 13, color: "var(--text-faint)" }}>No students have started this assignment yet.</div>
+        )}
       </div>
     </>
   );

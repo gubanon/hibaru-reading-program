@@ -53,13 +53,24 @@ export function AuthProvider({ children }) {
     return user;
   };
 
+  // Classroom-wide join link (/class/:token) — logged-in students join with
+  // an empty body (api.js attaches the bearer token); new students pass
+  // email/password/agreeToTerms.
+  const joinClass = async (classToken, body) => {
+    const { token, user } = await api.post(`/auth/class-invite/${classToken}/join`, body || {});
+    setToken(token);
+    setUser(user);
+    setViewAs("student");
+    return user;
+  };
+
   const logout = () => {
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, claimStudent, acceptInvite, logout, viewAs, setViewAs }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, claimStudent, acceptInvite, joinClass, logout, viewAs, setViewAs }}>
       {children}
     </AuthContext.Provider>
   );

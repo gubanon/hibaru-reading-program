@@ -108,7 +108,7 @@ router.post("/assignments/:id/quiz", async (req, res) => {
   const fresh = await db.prepare("SELECT * FROM submissions WHERE id = ?").get(sub.id);
   const miscues = JSON.parse(fresh.miscues || "{}");
   const m = metricsFor({ words: wordCount(a.passage), miscues, seconds: fresh.seconds, correct, items: questions.length });
-  res.json({ result: { ...m, seconds: fresh.seconds, totalSeconds: fresh.total_seconds, submissionId: fresh.id } });
+  res.json({ result: { ...m, seconds: fresh.seconds, totalSeconds: fresh.total_seconds, submissionId: fresh.id, miscues } });
 });
 
 router.get("/results", async (req, res) => {

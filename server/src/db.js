@@ -123,6 +123,7 @@ function init() {
         id TEXT PRIMARY KEY,
         teacher_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        join_token TEXT,
         created_at INTEGER NOT NULL
       );
 
@@ -206,6 +207,13 @@ function init() {
     // submitted — the Phil-IRI reading rate keeps using `seconds` (reading
     // phase only), this is the assignment-wide timer the student sees.
     await ensureColumn("submissions", "total_seconds", "total_seconds INTEGER NOT NULL DEFAULT 0");
+    // Exactly one shareable join link per classroom (/class/<token>).
+    // Backfill any classroom created before this column existed.
+    await ensureColumn("classrooms", "join_token", "join_token TEXT");
+    const tokenless = await db.prepare("SELECT id FROM classrooms WHERE join_token IS NULL OR join_token = ''").all();
+    for (const c of tokenless) {
+      await db.prepare("UPDATE classrooms SET join_token = ? WHERE id = ?").run(crypto.randomBytes(18).toString("base64url"), c.id);
+    }
 
     // Admin credentials are read from env vars only (server/.env, gitignored,
     // never committed) — there is deliberately no real password baked into

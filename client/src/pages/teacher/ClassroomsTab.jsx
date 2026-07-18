@@ -57,6 +57,17 @@ function ClassCard({ c, idx, onChanged }) {
   const [msg, setMsg] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState(c.name);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  async function copyClassLink() {
+    try {
+      await navigator.clipboard.writeText(c.classJoinUrl);
+    } catch {
+      window.prompt("Copy this class join link:", c.classJoinUrl);
+    }
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1500);
+  }
   const males = c.students.filter(s => s.sex === "M").sort((a, b) => a.surname.localeCompare(b.surname));
   const females = c.students.filter(s => s.sex !== "M").sort((a, b) => a.surname.localeCompare(b.surname));
 
@@ -120,14 +131,22 @@ function ClassCard({ c, idx, onChanged }) {
           </>
         )}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "14px 0 10px", fontSize: 12.5, color: FAINT }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "14px 0 10px", fontSize: 12.5, color: FAINT, flexWrap: "wrap" }}>
         <span>{c.students.length} students</span>
         <span>{c.assignmentCount} assignments</span>
         {!renaming && (
-          <button onClick={() => api.download(`/teacher/classrooms/${c.id}/docx`, `Consolidated Report - ${c.name}.docx`).catch(e => setErr(e.message))}
-            style={{ marginLeft: "auto", border: "1px solid var(--input-border)", cursor: "pointer", padding: "6px 12px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: ACCENT }}>
-            ⬇ DOCX Consolidated Report
-          </button>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 7 }}>
+            {c.classJoinUrl && (
+              <button onClick={copyClassLink}
+                style={{ border: "none", cursor: "pointer", padding: "6px 12px", borderRadius: 8, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700 }}>
+                {linkCopied ? "Copied ✓" : "🔗 Copy class link"}
+              </button>
+            )}
+            <button onClick={() => api.download(`/teacher/classrooms/${c.id}/docx`, `Consolidated Report - ${c.name}.docx`).catch(e => setErr(e.message))}
+              style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "6px 12px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700, color: ACCENT }}>
+              ⬇ DOCX Consolidated Report
+            </button>
+          </div>
         )}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -148,7 +167,7 @@ function ClassCard({ c, idx, onChanged }) {
           <input style={{ ...inputSm, flex: 1 }} value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && invite()} placeholder="student@example.com" />
           <button disabled={busy} onClick={invite} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: NAVY, color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>Invite</button>
         </div>
-        <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>They'll get an email with a "Join" link — they set up their own profile once they click it. You can also use "Copy link" on a pending invite to share it directly (e.g. Messenger).</div>
+        <div style={{ fontSize: 10.5, color: "var(--text-faint-2)", marginTop: 6 }}>They'll get an email with a "Join" link — they set up their own profile once they click it. Or share the classroom's single "🔗 class link" (above) with everyone at once — anyone with it can join this class.</div>
         {err && <div style={{ color: "#B3261E", fontSize: 11.5, marginTop: 6 }}>{err}</div>}
         {msg && !err && <div style={{ color: GREEN, fontSize: 11.5, marginTop: 6 }}>{msg}</div>}
       </div>
