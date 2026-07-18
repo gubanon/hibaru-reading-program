@@ -34,6 +34,36 @@ function matrixRowIndex(level, compLevel) {
   return MATRIX.findIndex(r => r.wrl === level && r.rcl === compLevel);
 }
 
+// The passage word-by-word with each miscue highlighted in its type's
+// color, plus a legend of the types that actually occurred — shared by the
+// submit screen and the Details view.
+export function MarkedPassage({ L, marked }) {
+  const present = MISCUE_TYPES.filter(t => marked.some(w => w.type === t.key));
+  return (
+    <>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: ".07em", margin: "22px 0 10px" }}>{L.markedPassage.toUpperCase()}</div>
+      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 18, fontSize: 14.5, lineHeight: 2.1 }}>
+        {marked.map((w, i) => {
+          const t = MISCUE_TYPES.find(x => x.key === w.type);
+          return (
+            <span key={i}>
+              <span title={t ? t.label : ""} style={{ background: t ? t.color.replace(")", " / 0.18)") : "transparent", borderBottom: t ? `2.5px solid ${t.color}` : "none", borderRadius: 4, padding: t ? "1px 3px" : 0 }}>{w.word}</span>{" "}
+            </span>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 8 }}>
+        {present.map(t => (
+          <span key={t.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5, color: "var(--text-muted)" }}>
+            <span style={{ width: 11, height: 11, borderRadius: 3, background: t.color }} />{t.label}
+          </span>
+        ))}
+        {!present.length && <span style={{ fontSize: 11.5, color: GREEN, fontWeight: 600 }}>{L.noMiscues}</span>}
+      </div>
+    </>
+  );
+}
+
 // Shared PART A / B / C presentation of one submission's results.
 // `r` needs: wpm, score, level, acc, correct, items, compLevel, profile,
 // tm, words, seconds, totalSeconds, miscues; `individualMiscues` (optional)

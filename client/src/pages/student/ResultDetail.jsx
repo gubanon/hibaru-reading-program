@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { MISCUE_TYPES } from "../../theme";
-import ResultParts from "./ResultParts";
+import ResultParts, { MarkedPassage } from "./ResultParts";
 
 function timeText(secs) {
   const m = Math.floor(secs / 60), s = secs % 60;
@@ -42,17 +41,7 @@ export default function ResultDetail({ L, submissionId, onBack }) {
 
       <ResultParts L={L} r={flat} individualMiscues={individualMiscues} />
 
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: ".07em", margin: "22px 0 10px" }}>{L.markedPassage.toUpperCase()}</div>
-      <div style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 18, fontSize: 14.5, lineHeight: 2.1, marginBottom: 8 }}>
-        {r.marked.map((w, i) => {
-          const t = MISCUE_TYPES.find(x => x.key === w.type);
-          return (
-            <span key={i}>
-              <span title={t ? t.label : ""} style={{ background: t ? t.color.replace(")", " / 0.18)") : "transparent", borderBottom: t ? `2.5px solid ${t.color}` : "none", borderRadius: 4, padding: t ? "1px 3px" : 0 }}>{w.word}</span>{" "}
-            </span>
-          );
-        })}
-      </div>
+      <MarkedPassage L={L} marked={r.marked} />
 
       <div style={{ fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: ".07em", margin: "22px 0 10px" }}>{L.answersReview.toUpperCase()}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
