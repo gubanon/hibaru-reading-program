@@ -560,7 +560,7 @@ async function fullReport(submissionId, teacherId) {
   const m = metricsFor({ words: a.wordCount, miscues, seconds: sub.seconds, correct: sub.correct_count, items: a.questions.length });
   const answers = JSON.parse(sub.answers || "{}");
   return {
-    name: `${sub.given_name} ${sub.surname} ${sub.mi}`.trim(), firstName: sub.given_name,
+    name: `${sub.given_name} ${sub.surname} ${sub.mi}`.trim() || sub.email, firstName: sub.given_name || sub.email,
     grade: sub.grade_section, assignment: a.title, words: a.wordCount,
     seconds: sub.seconds, miscues, metrics: m, answers,
     questions: a.questions.map((q, i) => ({ n: i + 1, text: q.text, options: q.options, chosen: answers[i] ?? null, correct: q.correct })),

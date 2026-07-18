@@ -9,11 +9,85 @@ function flattenAssignments(groups) {
   return out;
 }
 
+// The official Phil-IRI for JHS Form 3 Learner's Record layout for one
+// student — used by the all-students print view AND the single-student
+// "Print Phil-IRI Form 3" button, so the printed form always carries the
+// student's name and details.
+function Form3Record({ rec }) {
+  const m = rec.metrics;
+  return (
+    <div data-record="1" data-print-area="1" style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: "44px 52px", fontFamily: "'Times New Roman',Georgia,serif", fontSize: 14, color: "#000", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <img src="/assets/hibaru-logo-sm.png" alt="" style={{ height: 52 }} />
+        <div style={{ flex: 1 }} />
+        <div style={{ textAlign: "right", fontWeight: 700, fontSize: 14 }}>Phil-IRI for JHS Form 3</div>
+        <img src="/assets/taft-logo.png" alt="" style={{ height: 52 }} />
+      </div>
+      <div style={{ fontWeight: 700, fontSize: 15, margin: "14px 0 18px" }}>LEARNER'S RECORD</div>
+      <div style={{ display: "grid", gridTemplateColumns: "150px 12px 1fr", gap: "6px 4px", margin: "0 0 26px 14px", fontWeight: 700 }}>
+        <div>Student's Name</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.name}</div>
+        <div>Grade &amp; Section</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.grade}</div>
+        <div>School</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Taft National High School (303529)</div>
+        <div>Division</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Eastern Samar</div>
+        <div>Region</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Region VIII – Eastern Visayas</div>
+        <div>Reading Selection</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.assignment}</div>
+      </div>
+      <div style={{ borderTop: "2px solid #000", paddingTop: 10, marginBottom: 18 }}>
+        <div style={{ marginBottom: 10 }}><span style={{ fontWeight: 700, textDecoration: "underline" }}>PART A:</span> <b>Comprehension Level:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.compLevel}</span></div>
+        <div style={{ lineHeight: 1.9 }}>
+          <b>Total time in Reading the Text:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{Math.floor(rec.seconds / 60)}</span> minutes (= <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{rec.seconds}</span> seconds)<br />
+          <b>Reading Rate:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.wpm}</span> words per minute<br />
+          <b>Responses to Questions:</b> Score <span style={{ borderBottom: "1px solid #000", padding: "0 10px" }}>{m.correct} / {m.items}</span> = <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.acc}</span> %
+        </div>
+      </div>
+      <div style={{ borderTop: "2px solid #000", paddingTop: 10, marginBottom: 18 }}>
+        <div style={{ marginBottom: 10 }}><span style={{ fontWeight: 700, textDecoration: "underline" }}>PART B:</span> <b>Word Reading Level:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.level}</span></div>
+        <div style={{ display: "grid", gridTemplateColumns: "34px 1fr 150px", border: "1.5px solid #000", borderBottom: "none", fontSize: 13.5 }}>
+          <div style={{ borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "4px 8px" }}></div>
+          <div style={{ borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "4px 8px", fontWeight: 700, textAlign: "center" }}>Types of Miscues</div>
+          <div style={{ borderBottom: "1.5px solid #000", padding: "4px 8px", fontWeight: 700, textAlign: "center" }}>Number of Miscues</div>
+          {MISCUE_TYPES.map((t, ti) => (
+            <Fragment key={t.key}>
+              <div style={{ borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700 }}>{ti + 1}</div>
+              <div style={{ borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px" }}>{t.label} <i>{t.fil}</i></div>
+              <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center" }}>{rec.miscues[t.key] || 0}</div>
+            </Fragment>
+          ))}
+          <div style={{ gridColumn: "1 / 3", borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Total Miscues</div>
+          <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center", fontWeight: 700 }}>{m.tm}</div>
+          <div style={{ gridColumn: "1 / 3", borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Number of Words in the Passage</div>
+          <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center" }}>{m.words}</div>
+          <div style={{ gridColumn: "1 / 3", borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Word Reading Score</div>
+          <div style={{ borderBottom: "1.5px solid #000", padding: "3px 8px", textAlign: "center", fontWeight: 700 }}>{m.score}%</div>
+        </div>
+      </div>
+      <div style={{ borderTop: "2px solid #000", paddingTop: 10 }}>
+        <span style={{ fontWeight: 700, textDecoration: "underline" }}>PART C:</span> <b>Reading Profile:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.profile}</span>
+      </div>
+    </div>
+  );
+}
+
 function ReportSheet({ submissionId, onBack }) {
   const [r, setR] = useState(null);
   const [showParent, setShowParent] = useState(false);
+  const [showForm3, setShowForm3] = useState(false);
   useEffect(() => { api.get(`/teacher/submissions/${submissionId}/report`).then(d => setR(d.report)); }, [submissionId]);
   if (!r) return null;
+
+  if (showForm3) {
+    return (
+      <>
+        <div data-noprint="1" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <button onClick={() => setShowForm3(false)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>← Back to report</button>
+          <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Phil-IRI Form 3 · Learner's Record for {r.name}</div>
+          <div style={{ flex: 1 }} />
+          <button onClick={() => window.print()} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: "var(--ink)", color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>🖨 Print / Save as PDF</button>
+        </div>
+        <Form3Record rec={r} />
+      </>
+    );
+  }
   const m = r.metrics;
   const maxCount = Math.max(1, ...MISCUE_TYPES.map(t => r.miscues[t.key] || 0));
   const bars = MISCUE_TYPES.map(t => ({ ...t, count: r.miscues[t.key] || 0, pct: Math.round((r.miscues[t.key] || 0) / maxCount * 100) }));
@@ -27,7 +101,7 @@ function ReportSheet({ submissionId, onBack }) {
         <button onClick={onBack} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>← Back</button>
         <div style={{ flex: 1 }} />
         <button onClick={() => setShowParent(true)} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "8px 14px", borderRadius: 8, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>👨‍👩‍👧 Parent summary</button>
-        <button onClick={() => window.print()} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: "var(--ink)", color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>🖨 Print Phil-IRI Form 3</button>
+        <button onClick={() => { setShowForm3(true); setTimeout(() => window.print(), 350); }} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: "var(--ink)", color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>🖨 Print Phil-IRI Form 3</button>
       </div>
       <div data-print-area="1" style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: 26 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: "2px solid #22335E", paddingBottom: 12, marginBottom: 14 }}>
@@ -133,60 +207,7 @@ function PrintAllSheet({ assignmentId, onBack }) {
         <button onClick={() => window.print()} style={{ border: "none", cursor: "pointer", padding: "8px 16px", borderRadius: 8, background: "var(--ink)", color: "#fff", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}>🖨 Print / Save as PDF</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {records.map((rec, i) => {
-          const m = rec.metrics;
-          return (
-            <div key={i} data-record="1" data-print-area="1" style={{ background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: 14, padding: "44px 52px", fontFamily: "'Times New Roman',Georgia,serif", fontSize: 14, color: "#000", maxWidth: 760, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <img src="/assets/hibaru-logo-sm.png" alt="" style={{ height: 52 }} />
-                <div style={{ flex: 1 }} />
-                <div style={{ textAlign: "right", fontWeight: 700, fontSize: 14 }}>Phil-IRI for JHS Form 3</div>
-                <img src="/assets/taft-logo.png" alt="" style={{ height: 52 }} />
-              </div>
-              <div style={{ fontWeight: 700, fontSize: 15, margin: "14px 0 18px" }}>LEARNER'S RECORD</div>
-              <div style={{ display: "grid", gridTemplateColumns: "150px 12px 1fr", gap: "6px 4px", margin: "0 0 26px 14px", fontWeight: 700 }}>
-                <div>Student's Name</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.name}</div>
-                <div>Grade &amp; Section</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.grade}</div>
-                <div>School</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Taft National High School (303529)</div>
-                <div>Division</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Eastern Samar</div>
-                <div>Region</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>Region VIII – Eastern Visayas</div>
-                <div>Reading Selection</div><div>:</div><div style={{ borderBottom: "1.5px solid #000", fontWeight: 400, padding: "0 6px" }}>{rec.assignment}</div>
-              </div>
-              <div style={{ borderTop: "2px solid #000", paddingTop: 10, marginBottom: 18 }}>
-                <div style={{ marginBottom: 10 }}><span style={{ fontWeight: 700, textDecoration: "underline" }}>PART A:</span> <b>Comprehension Level:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.compLevel}</span></div>
-                <div style={{ lineHeight: 1.9 }}>
-                  <b>Total time in Reading the Text:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{Math.floor(rec.seconds / 60)}</span> minutes (= <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{rec.seconds}</span> seconds)<br />
-                  <b>Reading Rate:</b> <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.wpm}</span> words per minute<br />
-                  <b>Responses to Questions:</b> Score <span style={{ borderBottom: "1px solid #000", padding: "0 10px" }}>{m.correct} / {m.items}</span> = <span style={{ borderBottom: "1px solid #000", padding: "0 8px" }}>{m.acc}</span> %
-                </div>
-              </div>
-              <div style={{ borderTop: "2px solid #000", paddingTop: 10, marginBottom: 18 }}>
-                <div style={{ marginBottom: 10 }}><span style={{ fontWeight: 700, textDecoration: "underline" }}>PART B:</span> <b>Word Reading Level:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.level}</span></div>
-                <div style={{ display: "grid", gridTemplateColumns: "34px 1fr 150px", border: "1.5px solid #000", borderBottom: "none", fontSize: 13.5 }}>
-                  <div style={{ borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "4px 8px" }}></div>
-                  <div style={{ borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "4px 8px", fontWeight: 700, textAlign: "center" }}>Types of Miscues</div>
-                  <div style={{ borderBottom: "1.5px solid #000", padding: "4px 8px", fontWeight: 700, textAlign: "center" }}>Number of Miscues</div>
-                  {MISCUE_TYPES.map((t, ti) => (
-                    <Fragment key={t.key}>
-                      <div style={{ borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700 }}>{ti + 1}</div>
-                      <div style={{ borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px" }}>{t.label} <i>{t.fil}</i></div>
-                      <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center" }}>{rec.miscues[t.key] || 0}</div>
-                    </Fragment>
-                  ))}
-                  <div style={{ gridColumn: "1 / 3", borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Total Miscues</div>
-                  <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center", fontWeight: 700 }}>{m.tm}</div>
-                  <div style={{ gridColumn: "1 / 3", borderBottom: "1px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Number of Words in the Passage</div>
-                  <div style={{ borderBottom: "1px solid #000", padding: "3px 8px", textAlign: "center" }}>{m.words}</div>
-                  <div style={{ gridColumn: "1 / 3", borderBottom: "1.5px solid #000", borderRight: "1.5px solid #000", padding: "3px 8px", fontWeight: 700, textAlign: "right" }}>Word Reading Score</div>
-                  <div style={{ borderBottom: "1.5px solid #000", padding: "3px 8px", textAlign: "center", fontWeight: 700 }}>{m.score}%</div>
-                </div>
-              </div>
-              <div style={{ borderTop: "2px solid #000", paddingTop: 10 }}>
-                <span style={{ fontWeight: 700, textDecoration: "underline" }}>PART C:</span> <b>Reading Profile:</b> <span style={{ borderBottom: "1.5px solid #000", padding: "0 14px", fontWeight: 700 }}>{m.profile}</span>
-              </div>
-            </div>
-          );
-        })}
+        {records.map((rec, i) => <Form3Record key={i} rec={rec} />)}
         {!records.length && <div style={{ color: FAINT, fontSize: 13 }}>No turned-in submissions yet for this assignment.</div>}
       </div>
     </>
