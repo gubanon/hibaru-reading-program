@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api";
+import { useAuth } from "../../auth/AuthContext";
 import { NAVY, levelColor, statusMeta , ACCENT, GREEN } from "../../theme";
 import ResultDetail from "./ResultDetail";
 
@@ -8,6 +9,7 @@ function submittedText(L, ts) {
 }
 
 export default function Dashboard({ L, tasks, onStart, onProfile }) {
+  const { user } = useAuth();
   const [results, setResults] = useState(null);
   const [detailId, setDetailId] = useState(null);
 
@@ -18,7 +20,8 @@ export default function Dashboard({ L, tasks, onStart, onProfile }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Hi! 👋</h2>
+        {user?.avatar && <img src={user.avatar} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--card-border)" }} />}
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Hi{user?.given ? `, ${user.given}` : ""}! 👋</h2>
         <div style={{ flex: 1 }} />
         <button onClick={onProfile} style={{ border: "1px solid var(--input-border)", cursor: "pointer", padding: "8px 16px", borderRadius: 9, background: "var(--card-bg)", fontFamily: "inherit", fontSize: 12.5, fontWeight: 600, color: ACCENT }}>👤 {L.myProfile}</button>
       </div>

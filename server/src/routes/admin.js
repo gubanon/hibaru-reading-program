@@ -98,7 +98,10 @@ router.get("/learners", async (req, res) => {
     if (!byClass.has(key)) byClass.set(key, []);
     byClass.get(key).push(s);
   });
-  const bySurname = (a, b) => a.surname.localeCompare(b.surname);
+  const bySurname = (a, b) =>
+    a.surname.toLowerCase().localeCompare(b.surname.toLowerCase()) ||
+    a.given_name.toLowerCase().localeCompare(b.given_name.toLowerCase()) ||
+    (a.mi || "").toLowerCase().localeCompare((b.mi || "").toLowerCase());
   const groups = [...byClass.keys()].sort((a, b) => a.localeCompare(b)).map(className => {
     const students = byClass.get(className);
     return {

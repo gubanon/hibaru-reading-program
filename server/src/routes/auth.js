@@ -28,7 +28,7 @@ function publicUser(u) {
     surname: u.surname, given: u.given_name, mi: u.mi, sex: u.sex,
     position: u.position, grade: u.grade_section,
     school: u.school, division: u.division, region: u.region,
-    isMaster: !!u.is_master_admin
+    isMaster: !!u.is_master_admin, avatar: u.avatar || null
   };
 }
 
@@ -291,11 +291,28 @@ router.put("/me", requireAuth, async (req, res) => {
   if (req.user.role === "teacher") {
     return res.status(403).json({ error: "Contact your admin to update your account details." });
   }
-  const { surname, given, mi, sex, grade, email } = req.body || {};
+  const { surname, given, mi, sex, grade, email, avatar } = req.body || {};
+  const emailNorm = (email || "").trim().toLowerCase();
+  const clash = await db.prepare("SELECT id FROM users WHERE email = ? AND id != ?").get(emailNorm, req.user.id);
+  if (clash) return res.status(409).json({ error: "Another account already uses that email." });
+
+  // Profile picture: a small base64 data URL (client resizes to 256px).
+  // null/undefined leaves the current picture untouched; "" removes it.
+  let avatarValue;
+  if (avatar === "") avatarValue = null;
+  else if (typeof avatar === "string" && avatar.length) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,/.test(avatar)) return res.status(400).json({ error: "Profile picture must be a PNG, JPEG, or WEBP image." });
+    if (avatar.length > 300000) return res.status(400).json({ error: "That picture is too large — please choose a smaller one." });
+    avatarValue = avatar;
+  } else {
+    const current = await db.prepare("SELECT avatar FROM users WHERE id = ?").get(req.user.id);
+    avatarValue = current?.avatar || null;
+  }
+
   await db.prepare(`
-    UPDATE users SET surname = ?, given_name = ?, mi = ?, sex = ?, grade_section = ?, email = ?
+    UPDATE users SET surname = ?, given_name = ?, mi = ?, sex = ?, grade_section = ?, email = ?, avatar = ?
     WHERE id = ?
-  `).run(surname || "", given || "", mi || "", sex || "M", grade || "", (email || "").trim().toLowerCase(), req.user.id);
+  `).run(surname || "", given || "", mi || "", sex || "M", grade || "", emailNorm, avatarValue, req.user.id);
   const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
   res.json({ user: publicUser(user) });
 });

@@ -44,7 +44,11 @@ function ProfileMenu({ roleLabel }) {
         onClick={() => setOpen(o => !o)}
         style={{ display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(255,255,255,.25)", cursor: "pointer", padding: "5px 12px 5px 5px", borderRadius: 999, background: "transparent", fontFamily: "inherit" }}
       >
-        <div style={{ width: 26, height: 26, borderRadius: "50%", background: GOLD, color: NAVY, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}>{initial}</div>
+        {user?.avatar ? (
+          <img src={user.avatar} alt="" style={{ width: 26, height: 26, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+        ) : (
+          <div style={{ width: 26, height: 26, borderRadius: "50%", background: GOLD, color: NAVY, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700 }}>{initial}</div>
+        )}
         <span style={{ fontSize: 12.5, fontWeight: 600, color: "#AEB8D4" }}>{roleLabel || displayName}</span>
       </button>
       {open && (

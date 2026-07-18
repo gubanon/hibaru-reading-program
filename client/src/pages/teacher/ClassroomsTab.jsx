@@ -68,8 +68,13 @@ function ClassCard({ c, idx, onChanged }) {
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 1500);
   }
-  const males = c.students.filter(s => s.sex === "M").sort((a, b) => a.surname.localeCompare(b.surname));
-  const females = c.students.filter(s => s.sex !== "M").sort((a, b) => a.surname.localeCompare(b.surname));
+  // Alphabetical by LAST NAME, then First Name, then M.I. — case-insensitive.
+  const byName = (a, b) =>
+    a.surname.toLowerCase().localeCompare(b.surname.toLowerCase()) ||
+    a.given.toLowerCase().localeCompare(b.given.toLowerCase()) ||
+    a.mi.toLowerCase().localeCompare(b.mi.toLowerCase());
+  const males = c.students.filter(s => s.sex === "M").sort(byName);
+  const females = c.students.filter(s => s.sex !== "M").sort(byName);
 
   async function invite() {
     setErr(""); setMsg("");

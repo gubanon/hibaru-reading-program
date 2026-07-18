@@ -28,8 +28,9 @@ const en = {
   miscueDetails: "Miscue details", markedPassage: "Your reading, marked up", answersReview: "Your comprehension answers",
   yourAnswer: "Your answer", correctAnswer: "Correct answer", noMiscues: "No miscues detected — perfect reading!",
   myProfile: "My Profile", saveProfile: "Save / Update", profileSaved: "✓ Profile updated.",
+  photoHint: "Tap the photo to change it", removePhoto: "Remove photo",
   surname: "SURNAME", givenName: "GIVEN NAME", mi: "M.I.", sexLbl: "SEX", male: "Male", female: "Female",
-  gradeSection: "GRADE & SECTION", emailLbl: "DEPED EMAIL"
+  gradeSection: "GRADE & SECTION", emailLbl: "EMAIL"
 };
 
 const fil = {
@@ -62,8 +63,9 @@ const fil = {
   miscueDetails: "Detalye ng mga mali", markedPassage: "Ang binasa mo, may marka", answersReview: "Mga sagot mo sa pag-unawa",
   yourAnswer: "Sagot mo", correctAnswer: "Tamang sagot", noMiscues: "Walang natukoy na mali — perpektong pagbasa!",
   myProfile: "Aking Profile", saveProfile: "I-save / I-update", profileSaved: "✓ Na-update ang profile.",
+  photoHint: "Pindutin ang larawan upang palitan", removePhoto: "Alisin ang larawan",
   surname: "APELYIDO", givenName: "PANGALAN", mi: "M.I.", sexLbl: "KASARIAN", male: "Lalaki", female: "Babae",
-  gradeSection: "BAITANG & SEKSYON", emailLbl: "DEPED EMAIL"
+  gradeSection: "BAITANG & SEKSYON", emailLbl: "EMAIL"
 };
 
 export function strings(lang) {

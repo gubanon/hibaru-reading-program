@@ -207,6 +207,10 @@ function init() {
     // submitted — the Phil-IRI reading rate keeps using `seconds` (reading
     // phase only), this is the assignment-wide timer the student sees.
     await ensureColumn("submissions", "total_seconds", "total_seconds INTEGER NOT NULL DEFAULT 0");
+    // Student profile pictures — stored inline as a small base64 data URL
+    // (client resizes to 256px before upload) so they live in Turso and
+    // survive redeploys; Render's local disk doesn't.
+    await ensureColumn("users", "avatar", "avatar TEXT");
     // Exactly one shareable join link per classroom (/class/<token>).
     // Backfill any classroom created before this column existed.
     await ensureColumn("classrooms", "join_token", "join_token TEXT");

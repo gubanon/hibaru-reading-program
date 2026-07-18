@@ -113,7 +113,7 @@ router.get("/classrooms", async (req, res) => {
   for (const c of classes) {
     const students = await db.prepare(`
       SELECT u.* FROM classroom_students cs JOIN users u ON u.id = cs.student_id
-      WHERE cs.classroom_id = ? ORDER BY u.surname
+      WHERE cs.classroom_id = ? ORDER BY LOWER(u.surname), LOWER(u.given_name), LOWER(u.mi)
     `).all(c.id);
     const invites = await db.prepare("SELECT * FROM classroom_invites WHERE classroom_id = ? AND status = 'pending' ORDER BY created_at DESC").all(c.id);
     const assignmentCount = (await db.prepare("SELECT COUNT(*) n FROM assignments WHERE classroom_id = ?").get(c.id)).n;
