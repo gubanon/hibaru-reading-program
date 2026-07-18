@@ -233,7 +233,7 @@ export default function ProgressTab() {
         <div style={{ flex: 1 }} />
         <select data-noprint="1" value={assignmentId || ""} onChange={e => setAssignmentId(e.target.value)}
           style={{ fontFamily: "inherit", fontSize: 13, padding: "9px 12px", border: "1px solid var(--input-border)", borderRadius: 8, background: "var(--card-bg)" }}>
-          {assignments.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+          {assignments.map(a => <option key={a.id} value={a.id}>{a.title}{a.className ? ` — ${a.className}` : ""}</option>)}
         </select>
         <button data-noprint="1"
           onClick={() => api.download(`/teacher/assignments/${assignmentId}/results.csv`, `Results - ${progress.title}.csv`)}

@@ -57,6 +57,18 @@ router.post("/signup", authLimiter, async (req, res) => {
   res.json({ ok: true, message: "Your teacher account is pending admin approval." });
 });
 
+// A student joining a classroom should immediately count against every
+// existing assignment in it (progress denominators, not-started counts) —
+// without this, students who join AFTER an assignment was created are
+// invisible to it until they next open their own dashboard.
+async function seedSubmissionsForStudent(classroomId, studentId) {
+  const assignments = await db.prepare("SELECT id FROM assignments WHERE classroom_id = ?").all(classroomId);
+  for (const a of assignments) {
+    await db.prepare("INSERT OR IGNORE INTO submissions (id, assignment_id, student_id, status) VALUES (?, ?, ?, 'not-started')")
+      .run(nanoid(), a.id, studentId);
+  }
+}
+
 function lockMessage(retryAfterMs) {
   const mins = Math.max(1, Math.ceil(retryAfterMs / 60000));
   return `Too many failed attempts. Please wait ${mins} minute${mins === 1 ? "" : "s"} and try again.`;
@@ -172,6 +184,7 @@ router.post("/invite/:token/accept", authLimiter, async (req, res) => {
   if (inv.status !== "joined") {
     await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(inv.classroom_id, inv.student_id);
     await db.prepare("UPDATE classroom_invites SET status='joined', joined_at=? WHERE id=?").run(Date.now(), inv.id);
+    await seedSubmissionsForStudent(inv.classroom_id, inv.student_id);
   }
 
   res.json({ token: signToken(authedUser), user: publicUser(authedUser) });
@@ -200,6 +213,7 @@ router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
     const user = await db.prepare("SELECT * FROM users WHERE id = ?").get(payload.id);
     if (!user || user.role !== "student") return res.status(403).json({ error: "Only student accounts can join a classroom." });
     await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(cls.id, user.id);
+    await seedSubmissionsForStudent(cls.id, user.id);
     return res.json({ token: signToken(user), user: publicUser(user) });
   }
 
@@ -228,6 +242,7 @@ router.post("/class-invite/:token/join", authLimiter, async (req, res) => {
     user = await db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
   }
   await db.prepare("INSERT OR IGNORE INTO classroom_students (classroom_id, student_id) VALUES (?, ?)").run(cls.id, user.id);
+  await seedSubmissionsForStudent(cls.id, user.id);
   res.json({ token: signToken(user), user: publicUser(user) });
 });
 

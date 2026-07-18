@@ -364,7 +364,7 @@ router.get("/assignments", async (req, res) => {
         (last ? " · last on " + new Date(last).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "");
     }
     g.items.push({
-      id: a.id, title: a.title,
+      id: a.id, title: a.title, className: cls?.name || "",
       dateText: "Created " + new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + (a.updated_at ? " · Edited " + new Date(a.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""),
       meta: (cls ? cls.name + " · " : "") + a.genre + " · " + wordCount(a.passage) + " words · " + qCount + " questions · Due " + a.deadline_iso,
       doneText,
@@ -478,10 +478,15 @@ router.get("/assignments/:id/progress", async (req, res) => {
   });
   const turnedIn = rows.filter(r => r.status === "turned-in");
   const cls = await db.prepare("SELECT name FROM classrooms WHERE id=?").get(a.classId);
+  // Denominator comes from the LIVE roster, not just existing submission
+  // rows — a student who joined the classroom after this assignment was
+  // created counts as not-started even before their row is seeded.
+  const rosterCount = (await db.prepare("SELECT COUNT(*) n FROM classroom_students WHERE classroom_id = ?").get(a.classId)).n;
+  const denom = Math.max(Number(rosterCount), engaged.length);
   res.json({
     title: a.title, deadline: a.deadlineISO, className: cls?.name,
-    completionPct: subs.length ? Math.round(turnedIn.length / subs.length * 100) : 0,
-    notStartedCount: subs.length - engaged.length,
+    completionPct: denom ? Math.round(turnedIn.length / denom * 100) : 0,
+    notStartedCount: Math.max(0, denom - engaged.length),
     rows
   });
 });
